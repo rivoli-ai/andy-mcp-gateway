@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: mcpgateway-postgres
+    environment:
+      POSTGRES_DB: mcpgateway
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mcpgateway-network
+
+  mcpgateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcpgateway-app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcpgateway;Username=postgres;Password=postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - mcpgateway-network
+
+volumes:
+  postgres_data:
+
+networks:
+  mcpgateway-network:
+    driver: bridge
+
+
+
+
+
+
+
