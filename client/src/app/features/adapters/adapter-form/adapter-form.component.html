@@ -1,0 +1,272 @@
+<div class="page-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <button class="back-button" routerLink="/adapters">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Adapters
+      </button>
+      <div class="header-text">
+        <h1 class="page-title">{{ isEditMode ? 'Edit Adapter' : 'Create New Adapter' }}</h1>
+        <p class="page-description">
+          {{ isEditMode ? 'Update the adapter configuration below.' : 'Configure a new MCP adapter to connect to your services.' }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Section -->
+  <div class="form-container">
+    <form [formGroup]="adapterForm" (ngSubmit)="onSubmit()" class="adapter-form">
+      <!-- Basic Information Section -->
+      <div class="form-section">
+        <h2 class="section-title">Basic Information</h2>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="name" class="field-label">Name *</label>
+            <input
+              type="text"
+              id="name"
+              formControlName="name"
+              class="field-input"
+              placeholder="Enter adapter name"
+              [class.field-error]="adapterForm.get('name')?.invalid && adapterForm.get('name')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('name')?.hasError('required') && adapterForm.get('name')?.touched">
+              Name is required
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('name')?.hasError('minlength') && adapterForm.get('name')?.touched">
+              Name must be at least 3 characters long
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="url" class="field-label">URL *</label>
+            <input
+              type="url"
+              id="url"
+              formControlName="url"
+              class="field-input"
+              placeholder="https://example.com"
+              [class.field-error]="adapterForm.get('url')?.invalid && adapterForm.get('url')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('url')?.hasError('required') && adapterForm.get('url')?.touched">
+              URL is required
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('url')?.hasError('pattern') && adapterForm.get('url')?.touched">
+              Please enter a valid URL starting with http:// or https://
+            </div>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="description" class="field-label">Description</label>
+          <textarea
+            id="description"
+            formControlName="description"
+            class="field-textarea"
+            placeholder="Enter adapter description (optional)"
+            rows="3"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Configuration Section -->
+      <div class="form-section">
+        <h2 class="section-title">Configuration</h2>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="type" class="field-label">Type *</label>
+            <select
+              id="type"
+              formControlName="type"
+              class="field-select"
+              [class.field-error]="adapterForm.get('type')?.invalid && adapterForm.get('type')?.touched"
+            >
+              <option value="">Select adapter type</option>
+              <option [value]="AdapterType.StreamableHttp">Streamable HTTP</option>
+              <option [value]="AdapterType.Sse">Server-Sent Events (SSE)</option>
+            </select>
+            <div class="field-error-message" *ngIf="adapterForm.get('type')?.hasError('required') && adapterForm.get('type')?.touched">
+              Type is required
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="timeoutSeconds" class="field-label">Timeout (seconds)</label>
+            <input
+              type="number"
+              id="timeoutSeconds"
+              formControlName="timeoutSeconds"
+              class="field-input"
+              min="1"
+              max="300"
+              placeholder="30"
+              [class.field-error]="adapterForm.get('timeoutSeconds')?.invalid && adapterForm.get('timeoutSeconds')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('timeoutSeconds')?.hasError('min') && adapterForm.get('timeoutSeconds')?.touched">
+              Timeout must be at least 1 second
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('timeoutSeconds')?.hasError('max') && adapterForm.get('timeoutSeconds')?.touched">
+              Timeout cannot exceed 300 seconds
+            </div>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="checkbox-field">
+            <input
+              type="checkbox"
+              formControlName="enabled"
+              class="checkbox-input"
+            />
+            <span class="checkbox-label">Enable this adapter</span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Tools Section -->
+      <div class="form-section" *ngIf="adapterForm.get('url')?.value && adapterForm.get('name')?.value && adapterForm.get('type')?.value">
+        <h2 class="section-title">Tools</h2>
+        <div class="tools-section">
+          <button 
+            type="button" 
+            class="tools-button" 
+            (click)="listTools()" 
+            [disabled]="isListingTools || adapterForm.get('url')?.invalid || adapterForm.get('name')?.invalid || adapterForm.get('type')?.invalid">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            {{ isListingTools ? 'Loading...' : 'List Available Tools' }}
+          </button>
+          
+          <div class="tools-result" *ngIf="toolsResult">
+            <div class="tools-success" *ngIf="toolsResult.success">
+              <div *ngIf="toolsResult.tools && toolsResult.tools.length > 0" class="tools-display">
+                <div class="tools-header">
+                  <div class="tools-title">
+                    <svg class="tools-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                    <span>Available Tools</span>
+                  </div>
+                  <div class="tools-count">{{ toolsResult.tools.length }}</div>
+                </div>
+                
+                <div class="tools-list">
+                  <div *ngFor="let tool of toolsResult.tools; let i = index" class="tool-card">
+                    <div class="tool-header">
+                      <div class="tool-info">
+                        <h3 class="tool-name">{{ tool.name || tool.title || 'Unnamed Tool' }}</h3>
+                        <p *ngIf="tool.description" class="tool-description">{{ tool.description }}</p>
+                      </div>
+                      <div class="tool-type">
+                        <span class="type-badge">{{ tool.inputSchema?.type || 'function' }}</span>
+                      </div>
+                    </div>
+                    
+                    <div *ngIf="tool.inputSchema && getSchemaProperties(tool.inputSchema).length > 0" class="tool-parameters">
+                      <div class="parameters-header">
+                        <span class="parameters-title">Parameters</span>
+                        <span class="parameters-count">{{ getSchemaProperties(tool.inputSchema).length }}</span>
+                      </div>
+                      <div class="parameters-list">
+                        <div *ngFor="let prop of getSchemaProperties(tool.inputSchema)" class="parameter-item">
+                          <div class="parameter-info">
+                            <code class="parameter-name">{{ prop.name }}</code>
+                            <span class="parameter-type">{{ prop.type }}</span>
+                          </div>
+                          <div *ngIf="prop.required" class="parameter-required">Required</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tools-error" *ngIf="!toolsResult.success">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              <span>Failed to load tools: {{ toolsResult.error }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integration Section -->
+      <div class="form-section" *ngIf="adapterForm.get('name')?.value && adapterForm.get('type')?.value">
+        <h2 class="section-title">Integration</h2>
+        <p class="section-description">Use this code snippet to integrate this adapter into your MCP client configuration (e.g., Claude Desktop).</p>
+        
+        <div class="integration-container">
+          <div class="code-header">
+            <div class="code-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+              <span>Configuration Code</span>
+            </div>
+            <button type="button" class="copy-button" (click)="copyIntegrationCode()" title="Copy to clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre class="code-block"><code>{{ getIntegrationCode() }}</code></pre>
+        </div>
+        
+        <div class="integration-info">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>Add this configuration to your MCP client's config file (e.g., <code>~/.config/claude/claude_desktop_config.json</code>)</span>
+        </div>
+      </div>
+
+      <!-- Submit Error -->
+      <div class="form-section" *ngIf="submitError">
+        <div class="submit-error">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <div class="error-content">
+            <strong>Failed to Save Adapter</strong>
+            <p>{{ submitError }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button
+          type="button"
+          class="action-button secondary"
+          (click)="onCancel()"
+          [disabled]="isSubmitting"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="action-button primary"
+          [disabled]="adapterForm.invalid || isSubmitting"
+        >
+          <app-loading-spinner *ngIf="isSubmitting" size="small"></app-loading-spinner>
+          {{ isSubmitting ? 'Saving...' : (isEditMode ? 'Update Adapter' : 'Create Adapter') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

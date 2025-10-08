@@ -1,0 +1,249 @@
+<div class="page-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <button class="back-button" routerLink="/adapters">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Adapters
+      </button>
+      <div class="header-text">
+        <h1 class="page-title">{{ adapter?.name || 'Adapter Details' }}</h1>
+        <p class="page-description" *ngIf="adapter">
+          {{ adapter.description || 'MCP Adapter Configuration' }}
+        </p>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <button class="action-button secondary" [routerLink]="['/adapters', adapter?.id, 'edit']">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Edit Adapter
+      </button>
+      
+      <button class="action-button secondary" (click)="checkHealth()" [disabled]="isCheckingHealth">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <path d="M22 4L12 14.01l-3-3"/>
+        </svg>
+        {{ isCheckingHealth ? 'Checking...' : 'Health Check' }}
+      </button>
+      
+      <button class="action-button danger" (click)="deleteAdapter()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        Delete Adapter
+      </button>
+    </div>
+  </div>
+
+  <!-- Content Section -->
+  <div class="content-container" *ngIf="adapter">
+    <!-- Basic Information Card -->
+    <div class="info-card">
+      <div class="card-header">
+        <div class="card-title-section">
+          <h2 class="card-title">Basic Information</h2>
+          <p class="card-subtitle">Adapter configuration and settings</p>
+        </div>
+        <div class="card-status">
+          <app-status-badge [status]="adapter.status"></app-status-badge>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <label class="info-label">Name</label>
+            <span class="info-value">{{ adapter.name }}</span>
+          </div>
+          
+          <div class="info-item">
+            <label class="info-label">URL</label>
+            <div class="info-value url-container">
+              <code class="url-text">{{ adapter.url }}</code>
+            </div>
+          </div>
+          
+          <div class="info-item">
+            <label class="info-label">Type</label>
+            <span class="info-value type-badge">{{ adapter.type }}</span>
+          </div>
+          
+          <div class="info-item">
+            <label class="info-label">Description</label>
+            <span class="info-value description-text">
+              {{ adapter.description || 'No description provided' }}
+            </span>
+          </div>
+          
+          <div class="info-item">
+            <label class="info-label">Status</label>
+            <span class="info-value status-indicator" [class]="adapter.enabled ? 'enabled' : 'disabled'">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" *ngIf="adapter.enabled"/>
+                <path d="M15 9l-6 6M9 9l6 6" *ngIf="!adapter.enabled"/>
+              </svg>
+              {{ adapter.enabled ? 'Enabled' : 'Disabled' }}
+            </span>
+          </div>
+          
+          <div class="info-item">
+            <label class="info-label">Timeout</label>
+            <span class="info-value">{{ adapter.timeoutSeconds }} seconds</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Information Card -->
+    <div class="health-card">
+      <div class="card-header">
+        <div class="card-title-section">
+          <h2 class="card-title">Health Information</h2>
+          <p class="card-subtitle">Connection status and performance metrics</p>
+        </div>
+        <button class="refresh-button" (click)="checkHealth()" [disabled]="isCheckingHealth">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M3 3v5h5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M21 21v-5h-5"/>
+          </svg>
+          {{ isCheckingHealth ? 'Checking...' : 'Refresh' }}
+        </button>
+      </div>
+      
+      <div class="card-body">
+        <div class="health-grid">
+          <div class="health-item">
+            <label class="health-label">Health Status</label>
+            <span class="health-value health-status" [class]="adapter.isHealthy ? 'healthy' : 'unhealthy'">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" *ngIf="adapter.isHealthy"/>
+                <path d="M22 4L12 14.01l-3-3" *ngIf="adapter.isHealthy"/>
+                <circle cx="12" cy="12" r="10" *ngIf="!adapter.isHealthy"/>
+                <line x1="15" y1="9" x2="9" y2="15" *ngIf="!adapter.isHealthy"/>
+                <line x1="9" y1="9" x2="15" y2="15" *ngIf="!adapter.isHealthy"/>
+              </svg>
+              {{ adapter.isHealthy ? 'Healthy' : 'Unhealthy' }}
+            </span>
+          </div>
+          
+          <div class="health-item">
+            <label class="health-label">Last Health Check</label>
+            <span *ngIf="adapter.lastHealthCheck; else noCheck" class="health-value">
+              {{ adapter.lastHealthCheck | date:'medium' }}
+            </span>
+            <ng-template #noCheck>
+              <span class="health-value no-data">Never checked</span>
+            </ng-template>
+          </div>
+          
+          <div class="health-item">
+            <label class="health-label">Response Time</label>
+            <span *ngIf="adapter.lastResponseTimeMs; else noResponseTime" class="health-value">
+              {{ adapter.lastResponseTimeMs }}ms
+            </span>
+            <ng-template #noResponseTime>
+              <span class="health-value no-data">Not available</span>
+            </ng-template>
+          </div>
+          
+          <div class="health-item" *ngIf="adapter.lastError">
+            <label class="health-label">Last Error</label>
+            <div class="health-value error-container">
+              <code class="error-text">{{ adapter.lastError }}</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metadata Card -->
+    <div class="metadata-card">
+      <div class="card-header">
+        <div class="card-title-section">
+          <h2 class="card-title">Metadata</h2>
+          <p class="card-subtitle">Creation and modification information</p>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div class="metadata-grid">
+          <div class="metadata-item">
+            <label class="metadata-label">Created At</label>
+            <span class="metadata-value">{{ adapter.createdAt | date:'medium' }}</span>
+          </div>
+          
+          <div class="metadata-item">
+            <label class="metadata-label">Created By</label>
+            <span class="metadata-value">{{ adapter.createdBy || 'Unknown' }}</span>
+          </div>
+          
+          <div class="metadata-item">
+            <label class="metadata-label">Updated At</label>
+            <span class="metadata-value">{{ adapter.updatedAt | date:'medium' }}</span>
+          </div>
+          
+          <div class="metadata-item">
+            <label class="metadata-label">Updated By</label>
+            <span class="metadata-value">{{ adapter.updatedBy || 'Unknown' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integration Card -->
+    <div class="integration-card">
+      <div class="card-header">
+        <div class="card-title-section">
+          <h2 class="card-title">Integration</h2>
+          <p class="card-subtitle">Use this code to integrate the adapter into your MCP client</p>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div class="integration-container">
+          <div class="code-header">
+            <div class="code-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+              <span>Configuration Code</span>
+            </div>
+            <button type="button" class="copy-button" (click)="copyIntegrationCode()" title="Copy to clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre class="code-block"><code>{{ getIntegrationCode() }}</code></pre>
+        </div>
+        
+        <div class="integration-info">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <div class="info-text">
+            <p>Add this configuration to your MCP client's config file. For Claude Desktop, add it to:</p>
+            <code class="file-path">~/.config/claude/claude_desktop_config.json</code>
+            <p class="help-text">Place this inside the <code>"mcpServers"</code> object in your configuration file.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <app-loading-spinner [isLoading]="isLoading" message="Loading adapter details..."></app-loading-spinner>
+</div>
+
+
