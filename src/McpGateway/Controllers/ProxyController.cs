@@ -5,10 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace McpGateway.Controllers;
 
-/// <summary>
-/// API Controller for proxying requests to MCP adapters.
-/// Handles request forwarding, streaming, and message routing to registered adapters.
-/// </summary>
 [ApiController]
 [Authorize]
 [Route("adapters")]
@@ -20,79 +16,104 @@ public class ProxyController(
 {
     [AllowAnonymous]
     [HttpGet("{adapterName}/sse")]
-    public async Task<IActionResult> ForwardSseRequest(string adapterName)
+    public async Task ForwardSseRequest(string adapterName)
     {
-        var result = await proxyService.ForwardSseRequestAsync(adapterName, HttpContext);
-        return ConvertProxyResult(result);
+        try
+        {
+            await proxyService.ForwardSseRequestAsync(adapterName, HttpContext);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in SSE request to {AdapterName}", adapterName);
+        }
     }
 
     [AllowAnonymous]
-    [HttpPost("{name}/mcp")]
-    [HttpGet("{name}/mcp")]
-    public async Task<IActionResult> ForwardStreamableHttpRequest(string name, CancellationToken cancellationToken)
+[HttpPost("{name}/mcp")]
+[HttpGet("{name}/mcp")]
+public async Task ForwardStreamableHttpRequest(string name, CancellationToken cancellationToken)
+{
+    logger.LogInformation("Request started at {Time}", DateTime.UtcNow);
+    
+    try
     {
-        var result = await proxyService.ForwardStreamableHttpRequestAsync(name, HttpContext, cancellationToken);
-        return ConvertProxyResult(result);
+        // Log when cancellation is requested
+        using (cancellationToken.Register(() => 
+            logger.LogWarning("Cancellation requested at {Time}", DateTime.UtcNow)))
+        {
+            await proxyService.ForwardStreamableHttpRequestAsync(name, HttpContext, cancellationToken);
+        }
+        
+        logger.LogInformation("Request completed at {Time}", DateTime.UtcNow);
     }
-
+    catch (OperationCanceledException)
+    {
+        logger.LogWarning("Request was cancelled");
+        throw;
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error in streamable HTTP request to {AdapterName}", name);
+    }
+}
 
     /// <summary>
     /// Forward messages to an MCP adapter
     /// </summary>
     [AllowAnonymous]
     [HttpPost("{adapterName}/messages")]
-    public async Task<IActionResult> SendMessages(string adapterName)
+    public async Task SendMessages(string adapterName)
     {
         try
         {
             var method = BuildMethodWithQueryString("messages");
-            var result = await proxyService.ForwardRequestAsync(adapterName, HttpContext, method, retry: true);
-            return ConvertProxyResult(result);
+            await proxyService.ForwardRequestAsync(adapterName, HttpContext, method, retry: true);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error forwarding messages to adapter {AdapterName}", adapterName);
-            return StatusCode(500, new { error = "Internal server error" });
+            
+            // Only write error if response hasn't started
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.StatusCode = 500;
+                HttpContext.Response.ContentType = "application/json";
+                var errorJson = JsonSerializer.Serialize(new { error = "Internal server error" });
+                await HttpContext.Response.WriteAsync(errorJson);
+            }
         }
     }
 
-
     /// <summary>
-    /// Forward messages to an MCP adapter
+    /// Forward message to an MCP adapter
     /// </summary>
     [AllowAnonymous]
     [HttpPost("{adapterName}/message")]
-    public async Task<IActionResult> SendMessage(string adapterName)
+    public async Task SendMessage(string adapterName)
     {
         try
         {
             var method = BuildMethodWithQueryString("message");
-            var result = await proxyService.ForwardRequestAsync(adapterName,HttpContext, method, retry: true);
-            return ConvertProxyResult(result);
+            await proxyService.ForwardRequestAsync(adapterName, HttpContext, method, retry: true);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error forwarding messages to adapter {AdapterName}", adapterName);
-            return StatusCode(500, new { error = "Internal server error" });
+            logger.LogError(ex, "Error forwarding message to adapter {AdapterName}", adapterName);
+            
+            // Only write error if response hasn't started
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.StatusCode = 500;
+                HttpContext.Response.ContentType = "application/json";
+                var errorJson = JsonSerializer.Serialize(new { error = "Internal server error" });
+                await HttpContext.Response.WriteAsync(errorJson);
+            }
         }
     }
-
 
     private string BuildMethodWithQueryString(string method)
     {
         return !Request.QueryString.HasValue ? method :
             $"{method}{(method.Contains('?') ? "&" : "?")}{Request.QueryString.Value.TrimStart('?')}";
     }
-
-    private IActionResult ConvertProxyResult(ProxyResult result)
-    {
-        if (result.Success)
-        {
-            if (result.JsonContent.HasValue)
-                return Ok(result.JsonContent.Value);
-            return Ok(result.Content);
-        }
-        return StatusCode(result.StatusCode, new { error = result.Error });
-    }
-
 }

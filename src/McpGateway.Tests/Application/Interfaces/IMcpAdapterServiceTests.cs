@@ -176,11 +176,7 @@ public class IProxyServiceTests
         // Act & Assert
         interfaceType.GetMethod(nameof(IProxyService.ForwardRequestAsync))
             .Should().NotBeNull()
-            .And.Subject.ReturnType.Should().Be(typeof(Task<ProxyResult>));
-
-        interfaceType.GetMethod(nameof(IProxyService.ForwardGetRequestAsync))
-            .Should().NotBeNull()
-            .And.Subject.ReturnType.Should().Be(typeof(Task<ProxyResult>));
+            .And.Subject.ReturnType.Should().Be(typeof(Task));
 
         interfaceType.GetMethod(nameof(IProxyService.IsAdapterAvailableAsync))
             .Should().NotBeNull()
@@ -188,7 +184,11 @@ public class IProxyServiceTests
 
         interfaceType.GetMethod(nameof(IProxyService.ForwardSseRequestAsync))
             .Should().NotBeNull()
-            .And.Subject.ReturnType.Should().Be(typeof(Task<ProxyResult>));
+            .And.Subject.ReturnType.Should().Be(typeof(Task));
+
+        interfaceType.GetMethod(nameof(IProxyService.ForwardStreamableHttpRequestAsync))
+            .Should().NotBeNull()
+            .And.Subject.ReturnType.Should().Be(typeof(Task));
     }
 
     [Fact]
@@ -202,31 +202,28 @@ public class IProxyServiceTests
         method!.GetParameters().Should().HaveCount(4);
         method.GetParameters()[0].ParameterType.Should().Be(typeof(string));
         method.GetParameters()[0].Name.Should().Be("adapterName");
-        method.GetParameters()[1].ParameterType.Should().Be(typeof(string));
-        method.GetParameters()[1].Name.Should().Be("endpoint");
-        method.GetParameters()[2].ParameterType.Should().Be(typeof(System.Text.Json.JsonElement));
-        method.GetParameters()[2].Name.Should().Be("body");
+        method.GetParameters()[1].ParameterType.Should().Be(typeof(Microsoft.AspNetCore.Http.HttpContext));
+        method.GetParameters()[1].Name.Should().Be("context");
+        method.GetParameters()[2].ParameterType.Should().Be(typeof(string));
+        method.GetParameters()[2].Name.Should().Be("endpoint");
         method.GetParameters()[3].ParameterType.Should().Be(typeof(bool));
         method.GetParameters()[3].Name.Should().Be("retry");
         method.GetParameters()[3].HasDefaultValue.Should().BeTrue();
     }
 
     [Fact]
-    public void ForwardGetRequestAsync_ShouldAcceptCorrectParameters()
+    public void ForwardSseRequestAsync_ShouldAcceptCorrectParameters()
     {
         // Arrange
-        var method = typeof(IProxyService).GetMethod(nameof(IProxyService.ForwardGetRequestAsync));
+        var method = typeof(IProxyService).GetMethod(nameof(IProxyService.ForwardSseRequestAsync));
 
         // Act & Assert
         method.Should().NotBeNull();
-        method!.GetParameters().Should().HaveCount(3);
+        method!.GetParameters().Should().HaveCount(2);
         method.GetParameters()[0].ParameterType.Should().Be(typeof(string));
         method.GetParameters()[0].Name.Should().Be("adapterName");
-        method.GetParameters()[1].ParameterType.Should().Be(typeof(string));
-        method.GetParameters()[1].Name.Should().Be("endpoint");
-        method.GetParameters()[2].ParameterType.Should().Be(typeof(bool));
-        method.GetParameters()[2].Name.Should().Be("retry");
-        method.GetParameters()[2].HasDefaultValue.Should().BeTrue();
+        method.GetParameters()[1].ParameterType.Should().Be(typeof(Microsoft.AspNetCore.Http.HttpContext));
+        method.GetParameters()[1].Name.Should().Be("httpContext");
     }
 
     [Fact]
@@ -246,29 +243,16 @@ public class IProxyServiceTests
     public void ForwardStreamableHttpRequestAsync_ShouldAcceptCorrectParameters()
     {
         // Arrange
-        var sseMethods = typeof(IProxyService).GetMethods().Where(m => m.Name == nameof(IProxyService.ForwardSseRequestAsync)).ToArray();
-        var streamableMethods = typeof(IProxyService).GetMethods().Where(m => m.Name == nameof(IProxyService.ForwardStreamableHttpRequestAsync)).ToArray();
+        var method = typeof(IProxyService).GetMethod(nameof(IProxyService.ForwardStreamableHttpRequestAsync));
 
         // Act & Assert
-        sseMethods.Should().HaveCount(1);
-        streamableMethods.Should().HaveCount(1);
-
-        // Check ForwardSseRequestAsync method
-        var sseMethod = sseMethods.First();
-        sseMethod.GetParameters().Should().HaveCount(2);
-        sseMethod.GetParameters()[0].ParameterType.Should().Be(typeof(string));
-        sseMethod.GetParameters()[0].Name.Should().Be("adapterName");
-        sseMethod.GetParameters()[1].ParameterType.Should().Be(typeof(Microsoft.AspNetCore.Http.HttpContext));
-        sseMethod.GetParameters()[1].Name.Should().Be("httpContext");
-
-        // Check ForwardStreamableHttpRequestAsync method
-        var streamableMethod = streamableMethods.First();
-        streamableMethod.GetParameters().Should().HaveCount(3);
-        streamableMethod.GetParameters()[0].ParameterType.Should().Be(typeof(string));
-        streamableMethod.GetParameters()[0].Name.Should().Be("adapterName");
-        streamableMethod.GetParameters()[1].ParameterType.Should().Be(typeof(Microsoft.AspNetCore.Http.HttpContext));
-        streamableMethod.GetParameters()[1].Name.Should().Be("httpContext");
-        streamableMethod.GetParameters()[2].ParameterType.Should().Be(typeof(CancellationToken));
-        streamableMethod.GetParameters()[2].Name.Should().Be("cancellationToken");
+        method.Should().NotBeNull();
+        method!.GetParameters().Should().HaveCount(3);
+        method.GetParameters()[0].ParameterType.Should().Be(typeof(string));
+        method.GetParameters()[0].Name.Should().Be("adapterName");
+        method.GetParameters()[1].ParameterType.Should().Be(typeof(Microsoft.AspNetCore.Http.HttpContext));
+        method.GetParameters()[1].Name.Should().Be("httpContext");
+        method.GetParameters()[2].ParameterType.Should().Be(typeof(CancellationToken));
+        method.GetParameters()[2].Name.Should().Be("cancellationToken");
     }
 }

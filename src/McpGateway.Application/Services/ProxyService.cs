@@ -8,11 +8,8 @@ using Microsoft.Net.Http.Headers;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace McpGateway.Application.Services;
 
@@ -29,22 +26,210 @@ public class ProxyService(
     private const int BaseRetryDelayMs = 100;
 
     /// <summary>
-    /// Forwards a streamable HTTP request with Server-Sent Events (SSE) support to the specified adapter.
+    /// Executes an operation with exponential backoff retry logic.
     /// </summary>
-    /// <param name="adapterName">The name of the target adapter</param>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <returns>A ProxyResult indicating the outcome of the operation</returns>
-    public async Task<ProxyResult> ForwardSseRequestAsync(string adapterName, HttpContext httpContext)
+    /// <param name="operation">The operation to execute</param>
+    /// <param name="maxRetries">Maximum number of retry attempts</param>
+    private static async Task ExecuteWithRetryAsync(Func<Task> operation, int maxRetries = DefaultRetryAttempts)
     {
-        var adapter = await GetValidatedAdapterAsync(adapterName);
-        if (adapter == null)
+        Exception? lastException = null;
+        
+        for (var attempt = 0; attempt <= maxRetries; attempt++)
         {
-            return CreateNotFoundResult(adapterName);
+            try
+            {
+                await operation();
+                return; // Success
+            }
+            catch (Exception ex) when (attempt < maxRetries)
+            {
+                lastException = ex;
+                await DelayBeforeRetry(attempt);
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+            }
+        }
+        
+        // All retries failed - throw last exception
+        if (lastException != null)
+        {
+            throw lastException;
+        }
+    }
+
+    /// <summary>
+    /// Executes an operation with exponential backoff retry logic.
+    /// </summary>
+    /// <param name="operation">The operation to execute</param>
+    /// <param name="maxRetries">Maximum number of retry attempts</param>
+    /// <returns>The result of the operation</returns>
+    private static async Task<ProxyResult> ExecuteWithRetryAsync(Func<Task<ProxyResult>> operation, int maxRetries = DefaultRetryAttempts)
+    {
+        for (var attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                return await operation();
+            }
+            catch when (attempt < maxRetries)
+            {
+                await DelayBeforeRetry(attempt);
+            }
+        }
+
+        return CreateServiceUnavailableResult("Service temporarily unavailable after retries");
+    }
+
+    /// <summary>
+    /// Calculates and waits for the retry delay using exponential backoff.
+    /// </summary>
+    /// <param name="attemptNumber">The current attempt number (0-based)</param>
+    private static async Task DelayBeforeRetry(int attemptNumber)
+    {
+        var delayMs = (int)(Math.Pow(2, attemptNumber) * BaseRetryDelayMs);
+        await Task.Delay(TimeSpan.FromMilliseconds(delayMs));
+    }
+
+    /// <summary>
+    /// Checks if an exception is a cancellation-related error.
+    /// </summary>
+    /// <param name="ex">The exception to check</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>True if this is a cancellation error</returns>
+    private static bool IsCancellationException(Exception ex, CancellationToken cancellationToken)
+    {
+        return (ex is OperationCanceledException && cancellationToken.IsCancellationRequested) ||
+               (ex is TaskCanceledException && cancellationToken.IsCancellationRequested) ||
+               (ex is IOException ioEx && (ioEx.InnerException is OperationCanceledException || cancellationToken.IsCancellationRequested));
+    }
+
+    /// <summary>
+    /// Attempts to write an SSE error event to the response stream.
+    /// </summary>
+    /// <param name="httpContext">The current HTTP context</param>
+    /// <param name="errorMessage">The error message to send</param>
+    private static async Task TryWriteErrorEventAsync(HttpContext httpContext, string errorMessage)
+    {
+        if (httpContext.Response.HasStarted)
+        {
+            return;
         }
 
         try
         {
+            var errorData = JsonSerializer.Serialize(new { error = errorMessage });
+            var errorEvent = $"event: error\ndata: {errorData}\n\n";
 
+            await httpContext.Response.WriteAsync(errorEvent, httpContext.RequestAborted);
+            await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+        }
+        catch
+        {
+            // Silently ignore errors when trying to write error response
+            // as the connection may already be broken
+        }
+    }
+
+    /// <summary>
+    /// Writes an error response to the HTTP context if not already started
+    /// </summary>
+    /// <param name="context">The HTTP context</param>
+    /// <param name="statusCode">The HTTP status code</param>
+    /// <param name="message">The error message</param>
+    private static async Task WriteErrorResponseAsync(HttpContext context, int statusCode, string message)
+    {
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/json";
+            var errorJson = JsonSerializer.Serialize(new { error = message });
+            await context.Response.WriteAsync(errorJson);
+        }
+    }
+
+    /// <summary>
+    /// Creates a ProxyResult for error conditions.
+    /// </summary>
+    /// <param name="statusCode">The HTTP status code</param>
+    /// <param name="error">The error message</param>
+    /// <returns>An error ProxyResult</returns>
+    private static ProxyResult CreateErrorResult(int statusCode, string error)
+    {
+        return new ProxyResult
+        {
+            Success = false,
+            StatusCode = statusCode,
+            Error = error
+        };
+    }
+
+    /// <summary>
+    /// Creates a ProxyResult for adapter not found scenarios.
+    /// </summary>
+    /// <param name="adapterName">The name of the adapter that was not found</param>
+    /// <returns>A not found ProxyResult</returns>
+    private static ProxyResult CreateNotFoundResult(string adapterName)
+    {
+        return CreateErrorResult(404, $"Adapter '{adapterName}' not found");
+    }
+
+    /// <summary>
+    /// Creates a ProxyResult for disabled adapter scenarios.
+    /// </summary>
+    /// <param name="adapterName">The name of the disabled adapter</param>
+    /// <returns>A bad request ProxyResult</returns>
+    private static ProxyResult CreateDisabledAdapterResult(string adapterName)
+    {
+        return CreateErrorResult(400, $"Adapter '{adapterName}' is disabled");
+    }
+
+    /// <summary>
+    /// Creates a ProxyResult for service unavailable scenarios.
+    /// </summary>
+    /// <param name="message">The error message</param>
+    /// <returns>A service unavailable ProxyResult</returns>
+    private static ProxyResult CreateServiceUnavailableResult(string message)
+    {
+        return CreateErrorResult(503, message);
+    }
+
+    /// <summary>
+    /// Legacy method for creating proxied HTTP requests. Use CreateProxiedRequest instead.
+    /// </summary>
+    [Obsolete("Use CreateProxiedRequest instead")]
+    public static HttpRequestMessage CreateProxiedHttpRequest(HttpContext context, Func<Uri, Uri>? targetOverride = null)
+    {
+        return CreateProxiedRequest(context, targetOverride);
+    }
+
+    /// <summary>
+    /// Legacy method for copying HTTP responses. Use CopyResponseToContextAsync instead.
+    /// </summary>
+    [Obsolete("Use CopyResponseToContextAsync instead")]
+    public static Task CopyProxiedHttpResponseAsync(HttpContext context, HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        return CopyResponseToContextAsync(context, response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Forwards a streamable HTTP request with Server-Sent Events (SSE) support to the specified adapter.
+    /// Writes the response directly to the HttpContext response stream.
+    /// </summary>
+    /// <param name="adapterName">The name of the target adapter</param>
+    /// <param name="httpContext">The current HTTP context</param>
+    public async Task ForwardSseRequestAsync(string adapterName, HttpContext httpContext)
+    {
+        var adapter = await GetValidatedAdapterAsync(adapterName);
+        if (adapter == null)
+        {
+            await WriteErrorResponseAsync(httpContext, StatusCodes.Status404NotFound, $"Adapter '{adapterName}' not found");
+            return;
+        }
+
+        try
+        {
             ConfigureSseResponse(httpContext);
 
             using var client = CreateStreamingHttpClient();
@@ -55,89 +240,118 @@ public class ProxyService(
             response.EnsureSuccessStatusCode();
 
             await ProcessSseStreamAsync(response, httpContext, adapterName);
-
-            return CreateSuccessResult(200, "SSE connection completed successfully");
         }
         catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
         {
-            return HandleClientDisconnection(adapterName);
+            logger.LogInformation("SSE connection to {AdapterName} was cancelled by client", adapterName);
         }
         catch (HttpRequestException ex)
         {
-            return await HandleConnectionErrorAsync(ex, httpContext, adapterName);
+            logger.LogWarning(ex, "HTTP error connecting to adapter {AdapterName}", adapterName);
+            await TryWriteErrorEventAsync(httpContext, "Connection failed to upstream server");
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
-            return await HandleRequestTimeoutAsync(httpContext, adapterName);
+            logger.LogWarning("SSE connection to {AdapterName} timed out", adapterName);
+            await TryWriteErrorEventAsync(httpContext, "Connection timeout");
         }
         catch (Exception ex)
         {
-            return await HandleUnexpectedErrorAsync(ex, httpContext, adapterName);
+            logger.LogError(ex, "Unexpected error in SSE connection to {AdapterName}", adapterName);
+            await TryWriteErrorEventAsync(httpContext, "Internal server error");
         }
     }
 
     /// <summary>
     /// Forwards a streamable HTTP request to the specified adapter with cancellation support.
+    /// Writes the response directly to the HttpContext response stream.
     /// </summary>
     /// <param name="adapterName">The name of the target adapter</param>
     /// <param name="httpContext">The current HTTP context</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests</param>
-    /// <returns>A ProxyResult indicating the outcome of the operation</returns>
-    public async Task<ProxyResult> ForwardStreamableHttpRequestAsync(string adapterName, HttpContext httpContext, CancellationToken cancellationToken)
+    public async Task ForwardStreamableHttpRequestAsync(string adapterName, HttpContext httpContext, CancellationToken cancellationToken)
     {
         var adapter = await GetValidatedAdapterAsync(adapterName);
         if (adapter == null)
         {
-            SetResponseStatus(httpContext, StatusCodes.Status503ServiceUnavailable);
-            return CreateServiceUnavailableResult($"Adapter '{adapterName}' not found");
+            await WriteErrorResponseAsync(httpContext, StatusCodes.Status503ServiceUnavailable, $"Adapter '{adapterName}' not found");
+            return;
         }
+
+        HttpClient? client = null;
+        HttpRequestMessage? proxiedRequest = null;
+        HttpResponseMessage? response = null;
 
         try
         {
-
-            var proxiedRequest = CreateProxiedRequest(httpContext, uri => BuildAdapterUri(uri, adapter.Url));
-
-            using var client = CreateStreamingHttpClient();
-            using var response = await SendRequestAsync(client, proxiedRequest, cancellationToken);
-
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            proxiedRequest = CreateProxiedRequest(httpContext, uri => BuildAdapterUri(uri, adapter.Url));
+            client = CreateStreamingHttpClient();
+            
+            response = await SendRequestAsync(client, proxiedRequest, cancellationToken);
 
             await CopyResponseToContextAsync(httpContext, response, cancellationToken);
-
-            return CreateProxyResult(response.IsSuccessStatusCode, (int)response.StatusCode,
-                response.IsSuccessStatusCode ? "Request forwarded successfully" : "Request failed");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Streamable request to adapter {AdapterName} was cancelled by client", adapterName);
+        }
+        catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Streamable request to adapter {AdapterName} timed out or was cancelled", adapterName);
+        }
+        catch (IOException ex) when (ex.InnerException is OperationCanceledException || cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Streamable request to adapter {AdapterName} encountered I/O error (client disconnect)", adapterName);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error forwarding streamable HTTP request to adapter {AdapterName}", adapterName);
-            return CreateErrorResult(500, ex.Message);
+            
+            if (!httpContext.Response.HasStarted)
+            {
+                await WriteErrorResponseAsync(httpContext, 500, "Internal server error");
+            }
+        }
+        finally
+        {
+            // Explicit cleanup to ensure resources are released
+            response?.Dispose();
+            proxiedRequest?.Dispose();
+            client?.Dispose();
         }
     }
 
     /// <summary>
     /// Forwards a JSON POST request to the specified adapter endpoint.
+    /// Writes response directly to HttpContext.
     /// </summary>
     /// <param name="adapterName">The name of the target adapter</param>
+    /// <param name="context">The HTTP context</param>
     /// <param name="endpoint">The endpoint path to forward to</param>
-    /// <param name="body">The JSON body to send</param>
     /// <param name="retry">Whether to enable retry logic</param>
-    /// <returns>A ProxyResult containing the response from the adapter</returns>
-    public async Task<ProxyResult> ForwardRequestAsync(string adapterName, HttpContext context, string endpoint, bool retry = false)
+    public async Task ForwardRequestAsync(string adapterName, HttpContext context, string endpoint, bool retry = false)
     {
         var adapter = await GetValidatedAdapterAsync(adapterName);
         if (adapter == null)
         {
-            return CreateNotFoundResult(adapterName);
+            await WriteErrorResponseAsync(context, 404, $"Adapter '{adapterName}' not found");
+            return;
         }
 
         if (!IsAdapterEnabled(adapter))
         {
-            return CreateDisabledAdapterResult(adapterName);
+            await WriteErrorResponseAsync(context, 400, $"Adapter '{adapterName}' is disabled");
+            return;
         }
 
-        return retry
-            ? await ExecuteWithRetryAsync(() => SendPostRequestAsync(adapter, context, endpoint))
-            : await SendPostRequestAsync(adapter, context, endpoint);
+        if (retry)
+        {
+            await ExecuteWithRetryAsync(() => SendPostRequestAsync(adapter, context, endpoint));
+        }
+        else
+        {
+            await SendPostRequestAsync(adapter, context, endpoint);
+        }
     }
 
     /// <summary>
@@ -434,7 +648,6 @@ public class ProxyService(
         };
     }
 
-
     /// <summary>
     /// Creates a proxied HTTP request message from the current HTTP context.
     /// </summary>
@@ -538,19 +751,27 @@ public class ProxyService(
     /// <param name="cancellationToken">Cancellation token</param>
     public static async Task CopyResponseToContextAsync(HttpContext context, HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        SetResponseStatus(context, (int)response.StatusCode);
-        CopyResponseHeaders(context, response);
+        // IMPORTANT: Set status code and headers BEFORE writing body to avoid "response already started" error
+        if (!context.Response.HasStarted)
+        {
+            SetResponseStatus(context, (int)response.StatusCode);
+            CopyResponseHeaders(context, response);
+        }
+        
         await CopyResponseBodyAsync(context, response, cancellationToken);
     }
 
     /// <summary>
-    /// Sets the HTTP response status code.
+    /// Sets the HTTP response status code if the response hasn't started.
     /// </summary>
     /// <param name="context">The HTTP context</param>
     /// <param name="statusCode">The status code to set</param>
     private static void SetResponseStatus(HttpContext context, int statusCode)
     {
-        context.Response.StatusCode = statusCode;
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = statusCode;
+        }
     }
 
     /// <summary>
@@ -560,6 +781,12 @@ public class ProxyService(
     /// <param name="response">The proxied response</param>
     private static void CopyResponseHeaders(HttpContext context, HttpResponseMessage response)
     {
+        // Only copy headers if response hasn't started
+        if (context.Response.HasStarted)
+        {
+            return;
+        }
+
         foreach (var header in response.Headers)
         {
             context.Response.Headers[header.Key] = header.Value.ToArray();
@@ -589,7 +816,6 @@ public class ProxyService(
     /// Builds a new URI by replacing the address portion while preserving the path structure.
     /// </summary>
     /// <param name="originalUri">The original URI</param>
-    /// <param name="body"></param>
     /// <param name="newAddress">The new base address</param>
     /// <returns>A URI with the new address and adjusted path</returns>
     private static Uri BuildAdapterUri(Uri originalUri, string newAddress)
@@ -651,79 +877,32 @@ public class ProxyService(
         return uriBuilder.Uri;
     }
 
-
     /// <summary>
     /// Sends a POST request with JSON content to the specified adapter endpoint.
+    /// Response is written directly to HttpContext.
     /// </summary>
     /// <param name="adapter">The target adapter</param>
+    /// <param name="context">The HTTP context</param>
     /// <param name="endpoint">The endpoint path</param>
-    /// <param name="body">The JSON body to send</param>
-    /// <returns>A ProxyResult containing the response</returns>
-    private async Task<ProxyResult> SendPostRequestAsync(McpAdapter adapter, HttpContext context, string endpoint)
+    private async Task SendPostRequestAsync(McpAdapter adapter, HttpContext context, string endpoint)
     {
         try
         {
-            ConfigureSseResponse(context);
             using var client = CreateStreamingHttpClient();
-
-            var proxiedRequest = CreateProxiedHttpRequestV2(context, uri => BuildAdapterUri(uri,adapter.Url));
-
+            var proxiedRequest = CreateProxiedRequest(context, uri => BuildAdapterUri(uri, adapter.Url));
             var response = await client.SendAsync(proxiedRequest, CancellationToken.None);
 
-            await CopyProxiedHttpResponseV2Async(context, response, context.RequestAborted);
-            return await ProcessHttpResponseAsync(response, adapter.Name);
+            // This writes the response directly to context (status code, headers, and body)
+            await CopyResponseToContextAsync(context, response, context.RequestAborted);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to send POST request to adapter {AdapterName} at endpoint {Endpoint}", adapter.Name, endpoint);
-            return new ProxyResult
-            {
-                Success = false,
-                StatusCode = 500,
-                Error = $"Request failed: {ex.Message}"
-            };
+            logger.LogError(ex, "Failed to send POST request to adapter {AdapterName} at endpoint {Endpoint}", 
+                adapter.Name, endpoint);
+            
+            await WriteErrorResponseAsync(context, 500, $"Request failed: {ex.Message}");
+            throw; // Re-throw for retry mechanism
         }
-    }
-
-    public static HttpRequestMessage CreateProxiedHttpRequestV2(HttpContext context, Func<Uri, Uri>? targetOverride = null)
-    {
-       
-        var requestMessage = new HttpRequestMessage
-        {
-            Method = new HttpMethod(context.Request.Method),
-            RequestUri = targetOverride == null ? new Uri(context.Request.GetEncodedUrl()) : targetOverride(new Uri(context.Request.GetEncodedUrl())),
-            Content = new StreamContent(context.Request.Body) 
-        };
-
-        foreach (var header in context.Request.Headers)
-        {
-            // Skip the inbound Authorization header
-         
-
-            if (string.Equals(header.Key, HeaderNames.Host, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-
-            if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, [.. header.Value]))
-                requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, [.. header.Value]);
-        }
-        //requestMessage.Headers.Remove(HeaderNames.TransferEncoding);
-        requestMessage.Headers.TryAddWithoutValidation("Forwarded", $"for={context.Connection.RemoteIpAddress};proto={context.Request.Scheme};host={context.Request.Host.Value}");
-        return requestMessage;
-    }
-
-    private static Task CopyProxiedHttpResponseV2Async(HttpContext context, HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        context.Response.StatusCode = (int)response.StatusCode;
-
-        foreach (var header in response.Headers)
-            context.Response.Headers[header.Key] = header.Value.ToArray();
-        foreach (var header in response.Content.Headers)
-            context.Response.Headers[header.Key] = header.Value.ToArray();
-
-        context.Response.Headers.Remove(HeaderNames.TransferEncoding);
-
-        return response.Content.CopyToAsync(context.Response.Body, cancellationToken);
     }
 
     /// <summary>
@@ -764,17 +943,6 @@ public class ProxyService(
     private static string BuildAdapterEndpointUrl(string adapterUrl, string endpoint)
     {
         return $"{adapterUrl.TrimEnd('/')}/{endpoint}";
-    }
-
-    /// <summary>
-    /// Creates JSON HTTP content from a JsonElement.
-    /// </summary>
-    /// <param name="body">The JSON body</param>
-    /// <returns>StringContent with JSON data</returns>
-    private static StringContent CreateJsonContent(JsonElement body)
-    {
-        var json = JsonSerializer.Serialize(body);
-        return new StringContent(json, Encoding.UTF8, "application/json");
     }
 
     /// <summary>
@@ -837,213 +1005,4 @@ public class ProxyService(
         logger.LogWarning("MCP server {Server} returned {Status}: {Content}", adapterName, statusCode, content);
     }
 
-    /// <summary>
-    /// Executes an operation with exponential backoff retry logic.
-    /// </summary>
-    /// <param name="operation">The operation to execute</param>
-    /// <param name="maxRetries">Maximum number of retry attempts</param>
-    /// <returns>The result of the operation</returns>
-    private static async Task<ProxyResult> ExecuteWithRetryAsync(Func<Task<ProxyResult>> operation, int maxRetries = DefaultRetryAttempts)
-    {
-        for (var attempt = 0; attempt <= maxRetries; attempt++)
-        {
-            try
-            {
-                return await operation();
-            }
-            catch when (attempt < maxRetries)
-            {
-                await DelayBeforeRetry(attempt);
-            }
-        }
-
-        return CreateServiceUnavailableResult("Service temporarily unavailable after retries");
-    }
-
-    /// <summary>
-    /// Calculates and waits for the retry delay using exponential backoff.
-    /// </summary>
-    /// <param name="attemptNumber">The current attempt number (0-based)</param>
-    private static async Task DelayBeforeRetry(int attemptNumber)
-    {
-        var delayMs = (int)(Math.Pow(2, attemptNumber) * BaseRetryDelayMs);
-        await Task.Delay(TimeSpan.FromMilliseconds(delayMs));
-    }
-
-    /// <summary>
-    /// Handles client disconnection during SSE streaming.
-    /// </summary>
-    /// <param name="adapterName">The name of the adapter</param>
-    /// <returns>A ProxyResult indicating successful cancellation</returns>
-    private ProxyResult HandleClientDisconnection(string adapterName)
-    {
-        logger.LogInformation("SSE connection to {AdapterName} was cancelled by client", adapterName);
-        return CreateSuccessResult(200, "SSE connection cancelled by client");
-    }
-
-    /// <summary>
-    /// Handles HTTP connection errors during streaming.
-    /// </summary>
-    /// <param name="ex">The HTTP request exception</param>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <param name="adapterName">The name of the adapter</param>
-    /// <returns>A ProxyResult indicating the connection error</returns>
-    private async Task<ProxyResult> HandleConnectionErrorAsync(HttpRequestException ex, HttpContext httpContext, string adapterName)
-    {
-        logger.LogWarning(ex, "HTTP error connecting to adapter {AdapterName}", adapterName);
-        await TryWriteErrorEventAsync(httpContext, "Connection failed to upstream server");
-        return CreateErrorResult(502, "Failed to connect to upstream server");
-    }
-
-    /// <summary>
-    /// Handles request timeout errors during streaming.
-    /// </summary>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <param name="adapterName">The name of the adapter</param>
-    /// <returns>A ProxyResult indicating the timeout error</returns>
-    private async Task<ProxyResult> HandleRequestTimeoutAsync(HttpContext httpContext, string adapterName)
-    {
-        logger.LogWarning("SSE connection to {AdapterName} timed out", adapterName);
-        await TryWriteErrorEventAsync(httpContext, "Connection timeout");
-        return CreateErrorResult(504, "Connection timeout");
-    }
-
-    /// <summary>
-    /// Handles unexpected errors during streaming.
-    /// </summary>
-    /// <param name="ex">The unexpected exception</param>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <param name="adapterName">The name of the adapter</param>
-    /// <returns>A ProxyResult indicating the internal error</returns>
-    private async Task<ProxyResult> HandleUnexpectedErrorAsync(Exception ex, HttpContext httpContext, string adapterName)
-    {
-        logger.LogError(ex, "Unexpected error in SSE connection to {AdapterName}", adapterName);
-        await TryWriteErrorEventAsync(httpContext, "Internal server error");
-        return CreateErrorResult(500, "Internal server error");
-    }
-
-    /// <summary>
-    /// Attempts to write an SSE error event to the response stream.
-    /// </summary>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <param name="errorMessage">The error message to send</param>
-    private static async Task TryWriteErrorEventAsync(HttpContext httpContext, string errorMessage)
-    {
-        if (httpContext.Response.HasStarted)
-        {
-            return;
-        }
-
-        try
-        {
-            var errorData = JsonSerializer.Serialize(new { error = errorMessage });
-            var errorEvent = $"event: error\ndata: {errorData}\n\n";
-
-            await httpContext.Response.WriteAsync(errorEvent, httpContext.RequestAborted);
-            await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
-        }
-        catch
-        {
-            // Silently ignore errors when trying to write error response
-            // as the connection may already be broken
-        }
-    }
-
-    /// <summary>
-    /// Creates a ProxyResult for successful operations.
-    /// </summary>
-    /// <param name="statusCode">The HTTP status code</param>
-    /// <param name="content">The success message</param>
-    /// <returns>A successful ProxyResult</returns>
-    private static ProxyResult CreateSuccessResult(int statusCode, string content)
-    {
-        return new ProxyResult
-        {
-            Success = true,
-            StatusCode = statusCode,
-            Content = content
-        };
-    }
-
-    /// <summary>
-    /// Creates a ProxyResult for error conditions.
-    /// </summary>
-    /// <param name="statusCode">The HTTP status code</param>
-    /// <param name="error">The error message</param>
-    /// <returns>An error ProxyResult</returns>
-    private static ProxyResult CreateErrorResult(int statusCode, string error)
-    {
-        return new ProxyResult
-        {
-            Success = false,
-            StatusCode = statusCode,
-            Error = error
-        };
-    }
-
-    /// <summary>
-    /// Creates a generic ProxyResult with specified parameters.
-    /// </summary>  var proxiedRequest = HttpProxy.CreateProxiedHttpRequest(HttpContext, (uri) => ReplaceUriAddress(uri, targetAddress));
-    /// <param name="success">Whether the operation was successful</param>
-    /// <param name="statusCode">The HTTP status code</param>
-    /// <param name="content">The content or error message</param>
-    /// <returns>A configured ProxyResult</returns>
-    private static ProxyResult CreateProxyResult(bool success, int statusCode, string content)
-    {
-        return new ProxyResult
-        {
-            Success = success,
-            StatusCode = statusCode,
-            Content = success ? content : null,
-            Error = success ? null : content
-        };
-    }
-
-    /// <summary>
-    /// Creates a ProxyResult for adapter not found scenarios.
-    /// </summary>
-    /// <param name="adapterName">The name of the adapter that was not found</param>
-    /// <returns>A not found ProxyResult</returns>
-    private static ProxyResult CreateNotFoundResult(string adapterName)
-    {
-        return CreateErrorResult(404, $"Adapter '{adapterName}' not found");
-    }
-
-    /// <summary>
-    /// Creates a ProxyResult for disabled adapter scenarios.
-    /// </summary>
-    /// <param name="adapterName">The name of the disabled adapter</param>
-    /// <returns>A bad request ProxyResult</returns>
-    private static ProxyResult CreateDisabledAdapterResult(string adapterName)
-    {
-        return CreateErrorResult(400, $"Adapter '{adapterName}' is disabled");
-    }
-
-    /// <summary>
-    /// Creates a ProxyResult for service unavailable scenarios.
-    /// </summary>
-    /// <param name="message">The error message</param>
-    /// <returns>A service unavailable ProxyResult</returns>
-    private static ProxyResult CreateServiceUnavailableResult(string message)
-    {
-        return CreateErrorResult(503, message);
-    }
-
-    /// <summary>
-    /// Legacy method for creating proxied HTTP requests. Use CreateProxiedRequest instead.
-    /// </summary>
-    [Obsolete("Use CreateProxiedRequest instead")]
-    public static HttpRequestMessage CreateProxiedHttpRequest(HttpContext context, Func<Uri, Uri>? targetOverride = null)
-    {
-        return CreateProxiedRequest(context, targetOverride);
-    }
-
-    /// <summary>
-    /// Legacy method for copying HTTP responses. Use CopyResponseToContextAsync instead.
-    /// </summary>
-    [Obsolete("Use CopyResponseToContextAsync instead")]
-    public static Task CopyProxiedHttpResponseAsync(HttpContext context, HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        return CopyResponseToContextAsync(context, response, cancellationToken);
-    }
 }

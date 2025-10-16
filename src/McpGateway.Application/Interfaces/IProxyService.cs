@@ -9,10 +9,10 @@ namespace McpGateway.Application.Interfaces;
 /// </summary>
 public interface IProxyService
 {
-    Task<ProxyResult> ForwardRequestAsync(string adapterName, HttpContext context, string endpoint,bool retry = false);
+    Task ForwardRequestAsync(string adapterName, HttpContext context, string endpoint, bool retry = false);
     Task<bool> IsAdapterAvailableAsync(string adapterName);
-    Task<ProxyResult> ForwardSseRequestAsync(string adapterName, HttpContext httpContext);
-    Task<ProxyResult> ForwardStreamableHttpRequestAsync(string adapterName, HttpContext httpContext, CancellationToken cancellationToken);
+    Task ForwardSseRequestAsync(string adapterName, HttpContext httpContext);
+    Task ForwardStreamableHttpRequestAsync(string adapterName, HttpContext httpContext, CancellationToken cancellationToken);
 }
 
 /// <summary>
