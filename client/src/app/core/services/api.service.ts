@@ -41,6 +41,23 @@ export class ApiService implements IApiService {
       );
   }
 
+  getBlob(endpoint: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}${endpoint}`, { 
+      responseType: 'blob',
+      observe: 'response'
+    }).pipe(
+      map(response => response.body as Blob),
+      catchError(this.handleError)
+    );
+  }
+
+  postFormData<T>(endpoint: string, formData: FormData): Observable<T> {
+    return this.http.post<T>(`${this.baseUrl}${endpoint}`, formData)
+      .pipe(
+        catchError(this.handleError)
+      );
+  }
+
   private handleError(error: any): Observable<never> {
     let errorMessage = 'An error occurred';
     

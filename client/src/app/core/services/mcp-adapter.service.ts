@@ -85,6 +85,28 @@ export class McpAdapterService implements IMcpAdapterService {
     return this.apiService.post<{ message: string; success: boolean }>(`${this.endpoint}/reload`, {});
   }
 
+  exportAdaptersToExcel(): Observable<Blob> {
+    return this.apiService.getBlob(`${this.endpoint}/export`);
+  }
+
+  importAdaptersFromExcel(file: File): Observable<{ 
+    message: string; 
+    successCount: number; 
+    failedCount: number; 
+    validationErrors: string[]; 
+    failedAdapters: any[] 
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.apiService.postFormData<{ 
+      message: string; 
+      successCount: number; 
+      failedCount: number; 
+      validationErrors: string[]; 
+      failedAdapters: any[] 
+    }>(`${this.endpoint}/import`, formData);
+  }
+
   testConnection(adapter: McpAdapter): Observable<{ success: boolean; error?: string; tools?: any[] }> {
     if (adapter.type === AdapterType.StreamableHttp) {
       return from(this.testHttpAdapter(adapter)).pipe(

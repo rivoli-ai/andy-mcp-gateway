@@ -39,6 +39,7 @@ builder.Services.AddAutoMapper(typeof(DtosMapperProfile), typeof(EntityMapperPro
 // Add Application Services
 builder.Services.AddScoped<IMcpAdapterService, McpAdapterService>();
 builder.Services.AddScoped<IProxyService, ProxyService>();
+builder.Services.AddScoped<ExcelService>();
 
 // Add Repositories
 builder.Services.AddScoped<IMcpAdapterRepository, McpAdapterRepository>();

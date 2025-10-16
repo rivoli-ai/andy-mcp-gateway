@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
+using McpGateway.Application.Services;
 
 namespace McpGateway.Controllers;
 
@@ -13,11 +14,16 @@ namespace McpGateway.Controllers;
 public class AdaptersController : ControllerBase
 {
     private readonly IMcpAdapterService _adapterService;
+    private readonly ExcelService _excelService;
     private readonly ILogger<AdaptersController> _logger;
 
-    public AdaptersController(IMcpAdapterService adapterService, ILogger<AdaptersController> logger)
+    public AdaptersController(
+        IMcpAdapterService adapterService, 
+        ExcelService excelService,
+        ILogger<AdaptersController> logger)
     {
         _adapterService = adapterService;
+        _excelService = excelService;
         _logger = logger;
     }
 
@@ -282,6 +288,99 @@ public class AdaptersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reloading mappings");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Export all adapters to Excel file
+    /// </summary>
+    [HttpGet("export")]
+    public async Task<ActionResult> ExportAdaptersToExcel()
+    {
+        try
+        {
+            var adapters = await _adapterService.GetAllAsync();
+            
+            if (adapters.Adapters == null || !adapters.Adapters.Any())
+            {
+                return BadRequest(new { error = "No adapters to export" });
+            }
+
+            var excelData = _excelService.ExportAdaptersToExcel(adapters.Adapters);
+            
+            var fileName = $"MCP_Adapters_Export_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
+            
+            return File(excelData, 
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting adapters to Excel");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Import adapters from Excel file
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<ActionResult> ImportAdaptersFromExcel(IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "No file uploaded" });
+            }
+
+            if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { error = "File must be an Excel (.xlsx) file" });
+            }
+
+            using var stream = file.OpenReadStream();
+            var (adapters, errors) = _excelService.ImportAdaptersFromExcel(stream);
+
+            if (errors.Any() && !adapters.Any())
+            {
+                return BadRequest(new { error = "Import failed", errors });
+            }
+
+            var successCount = 0;
+            var failedAdapters = new List<object>();
+
+            foreach (var adapter in adapters)
+            {
+                try
+                {
+                    await _adapterService.CreateAsync(adapter);
+                    successCount++;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    failedAdapters.Add(new { name = adapter.Name, error = ex.Message });
+                }
+                catch (Exception ex)
+                {
+                    failedAdapters.Add(new { name = adapter.Name, error = "Failed to create adapter" });
+                    _logger.LogError(ex, "Error creating adapter {Name} during import", adapter.Name);
+                }
+            }
+
+            return Ok(new
+            {
+                message = $"Import completed. {successCount} adapters imported successfully.",
+                successCount,
+                failedCount = failedAdapters.Count,
+                validationErrors = errors,
+                failedAdapters
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error importing adapters from Excel");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

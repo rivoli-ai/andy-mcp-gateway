@@ -5,6 +5,7 @@ import { MarkdownModule } from 'ngx-markdown';
 import { McpAdapterService } from '../../core/services/mcp-adapter.service';
 import { AdapterList, AdapterStatus } from '../../core/models/mcp-adapter.model';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
+import { NotificationService } from '../../shared/components/notification/notification.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -19,18 +20,67 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
           <p class="dashboard-subtitle">Monitor and manage your MCP adapters</p>
         </div>
         <div class="header-actions">
-          <button class="btn btn-primary" routerLink="/adapters/new">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-            Add Adapter
-          </button>
-          <button class="btn btn-secondary" (click)="refreshData()" [disabled]="isLoading">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M3 3v5h5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M21 21v-5h-5"/>
-            </svg>
-            Refresh
-          </button>
+          <div class="action-button-group">
+            <button class="action-btn export-btn" (click)="exportAdapters()" [disabled]="isLoading || adapterStats.total === 0" title="Export all adapters to Excel">
+              <div class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="12" y2="18"/>
+                  <line x1="15" y1="15" x2="12" y2="18"/>
+                </svg>
+              </div>
+              <div class="btn-content">
+                <span class="btn-label">Export</span>
+                <span class="btn-hint">Excel file</span>
+              </div>
+            </button>
+            <button class="action-btn import-btn" (click)="fileInput.click()" [disabled]="isLoading" title="Import adapters from Excel file">
+              <div class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="11" x2="12" y2="17"/>
+                  <line x1="9" y1="14" x2="12" y2="11"/>
+                  <line x1="15" y1="14" x2="12" y2="11"/>
+                </svg>
+              </div>
+              <div class="btn-content">
+                <span class="btn-label">Import</span>
+                <span class="btn-hint">Upload file</span>
+              </div>
+            </button>
+            <input #fileInput type="file" accept=".xlsx" (change)="onFileSelected($event)" style="display: none;" />
+          </div>
+          <div class="action-button-group">
+            <button class="action-btn primary-btn" routerLink="/adapters/new">
+              <div class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="16"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+              </div>
+              <div class="btn-content">
+                <span class="btn-label">New Adapter</span>
+                <span class="btn-hint">Create</span>
+              </div>
+            </button>
+            <button class="action-btn refresh-btn" (click)="refreshData()" [disabled]="isLoading">
+              <div class="btn-icon" [class.spinning]="isLoading">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              </div>
+              <div class="btn-content">
+                <span class="btn-label">Refresh</span>
+                <span class="btn-hint">Reload</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -220,8 +270,196 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 
     .header-actions {
       display: flex;
-      gap: var(--space-3);
+      gap: var(--space-4);
       flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .action-button-group {
+      display: flex;
+      gap: var(--space-2);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-xl);
+      padding: var(--space-1);
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+      position: relative;
+      overflow: hidden;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
+        opacity: 0;
+        transition: opacity var(--transition-fast);
+      }
+
+      &:hover:not(:disabled)::before {
+        opacity: 1;
+      }
+
+      &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .btn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-md);
+      flex-shrink: 0;
+      transition: all var(--transition-normal);
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      &.spinning {
+        animation: spin 1s linear infinite;
+      }
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .btn-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+
+    .btn-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .btn-hint {
+      font-size: 0.625rem;
+      opacity: 0.75;
+      line-height: 1;
+    }
+
+    /* Export Button */
+    .export-btn {
+      background: #10b981;
+      color: white;
+      border: 1px solid #059669;
+
+      .btn-icon {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      &:hover:not(:disabled) {
+        background: #059669;
+        border-color: #047857;
+        
+        .btn-icon {
+          background: rgba(255, 255, 255, 0.25);
+          transform: scale(1.05);
+        }
+      }
+    }
+
+    /* Import Button */
+    .import-btn {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+
+      .btn-icon {
+        background: #f1f5f9;
+        color: #64748b;
+      }
+
+      &:hover:not(:disabled) {
+        background: var(--bg-tertiary);
+        border-color: var(--border-strong);
+        
+        .btn-icon {
+          background: #e2e8f0;
+          color: #475569;
+          transform: scale(1.05);
+        }
+      }
+    }
+
+    /* Primary Button */
+    .primary-btn {
+      background: var(--primary-600);
+      color: white;
+
+      .btn-icon {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      &:hover:not(:disabled) {
+        background: var(--primary-700);
+        
+        .btn-icon {
+          background: rgba(255, 255, 255, 0.25);
+          transform: scale(1.05);
+        }
+      }
+    }
+
+    /* Refresh Button */
+    .refresh-btn {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+
+      .btn-icon {
+        background: #f1f5f9;
+        color: #64748b;
+      }
+
+      &:hover:not(:disabled) {
+        background: var(--bg-tertiary);
+        border-color: var(--border-strong);
+        
+        .btn-icon {
+          background: #e2e8f0;
+          color: #475569;
+        }
+      }
     }
 
     .stats-grid {
@@ -599,7 +837,92 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       }
     }
 
+    /* Dark Theme Support */
+    :host-context(.dark-theme) {
+      .action-button-group {
+        background: #1e293b;
+        border-color: #334155;
+      }
+
+      .export-btn {
+        background: #059669;
+        border-color: #047857;
+        
+        &:hover:not(:disabled) {
+          background: #047857;
+          border-color: #065f46;
+        }
+      }
+
+      .import-btn,
+      .refresh-btn {
+        background: #1e293b;
+        color: #e2e8f0;
+        border-color: #475569;
+
+        .btn-icon {
+          background: #334155;
+          color: #94a3b8;
+        }
+
+        &:hover:not(:disabled) {
+          background: #334155;
+          border-color: #64748b;
+          
+          .btn-icon {
+            background: #475569;
+            color: #cbd5e1;
+            transform: scale(1.05);
+          }
+        }
+      }
+
+      .primary-btn {
+        background: var(--primary-600);
+        
+        &:hover:not(:disabled) {
+          background: var(--primary-700);
+        }
+      }
+
+      .adapter-description {
+        code {
+          background: #1e293b;
+          color: #94a3b8;
+        }
+        
+        pre {
+          background: #0f172a;
+          border-color: #334155;
+        }
+        
+        strong {
+          color: #cbd5e1;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+          color: #f1f5f9;
+        }
+      }
+    }
+
     /* Responsive Design */
+    @media (max-width: 1024px) {
+      .header-actions {
+        flex-direction: column;
+        align-items: stretch;
+        
+        .action-button-group {
+          justify-content: space-between;
+        }
+      }
+
+      .action-btn {
+        flex: 1;
+        justify-content: flex-start;
+      }
+    }
+
     @media (max-width: 768px) {
       .dashboard-header {
         flex-direction: column;
@@ -608,6 +931,16 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 
       .header-actions {
         justify-content: stretch;
+        width: 100%;
+      }
+
+      .action-button-group {
+        flex-direction: column;
+      }
+
+      .action-btn {
+        width: 100%;
+        justify-content: flex-start;
       }
 
       .stats-grid {
@@ -628,6 +961,37 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       .adapter-actions {
         align-self: stretch;
       }
+
+      .btn-content {
+        .btn-hint {
+          display: none;
+        }
+      }
+    }
+
+    @media (max-width: 480px) {
+      .action-btn {
+        padding: var(--space-2);
+        gap: var(--space-2);
+      }
+
+      .btn-icon {
+        width: 22px;
+        height: 22px;
+        
+        svg {
+          width: 14px;
+          height: 14px;
+        }
+      }
+
+      .btn-label {
+        font-size: 0.75rem;
+      }
+
+      .btn-hint {
+        font-size: 0.5625rem;
+      }
     }
   `]
 })
@@ -643,7 +1007,10 @@ export class DashboardComponent implements OnInit {
   recentAdapters: any[] = [];
   isLoading = false;
 
-  constructor(private adapterService: McpAdapterService) {}
+  constructor(
+    private adapterService: McpAdapterService,
+    private notificationService: NotificationService
+  ) {}
 
   ngOnInit(): void {
     this.loadDashboardData();
@@ -688,5 +1055,110 @@ export class DashboardComponent implements OnInit {
   getPercentage(value: number, total: number): number {
     if (total === 0) return 0;
     return Math.round((value / total) * 100);
+  }
+
+  exportAdapters(): void {
+    this.isLoading = true;
+    this.adapterService.exportAdaptersToExcel().subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `MCP_Adapters_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        this.isLoading = false;
+        this.notificationService.success(
+          'Export Successful',
+          `${this.adapterStats.total} adapter(s) exported to Excel file`
+        );
+      },
+      error: (error) => {
+        console.error('Error exporting adapters:', error);
+        this.notificationService.error(
+          'Export Failed',
+          error.message || 'Failed to export adapters. Please try again.'
+        );
+        this.isLoading = false;
+      }
+    });
+  }
+
+  onFileSelected(event: any): void {
+    const file: File = event.target.files[0];
+    if (file) {
+      this.importAdapters(file);
+    }
+    // Reset file input
+    event.target.value = '';
+  }
+
+  importAdapters(file: File): void {
+    if (!file.name.endsWith('.xlsx')) {
+      this.notificationService.error(
+        'Invalid File Type',
+        'Please select an Excel (.xlsx) file'
+      );
+      return;
+    }
+
+    this.isLoading = true;
+    this.adapterService.importAdaptersFromExcel(file).subscribe({
+      next: (result) => {
+        this.isLoading = false;
+        
+        // Build detailed message
+        const details: string[] = [];
+        
+        if (result.validationErrors && result.validationErrors.length > 0) {
+          details.push('Validation Warnings: ' + result.validationErrors.length);
+        }
+        
+        if (result.failedAdapters && result.failedAdapters.length > 0) {
+          details.push('Failed: ' + result.failedCount);
+        }
+        
+        const detailMessage = details.length > 0 ? details.join(', ') : 'All adapters imported successfully';
+        
+        // Show appropriate notification
+        if (result.successCount > 0 && result.failedCount === 0) {
+          this.notificationService.success(
+            'Import Successful',
+            `${result.successCount} adapter(s) imported. ${detailMessage}`
+          );
+        } else if (result.successCount > 0) {
+          this.notificationService.warning(
+            'Import Partially Successful',
+            `${result.successCount} adapter(s) imported. ${detailMessage}`
+          );
+        } else {
+          this.notificationService.error(
+            'Import Failed',
+            `No adapters were imported. ${detailMessage}`
+          );
+        }
+        
+        // Log details to console
+        if (result.validationErrors && result.validationErrors.length > 0) {
+          console.warn('Validation errors:', result.validationErrors);
+        }
+        if (result.failedAdapters && result.failedAdapters.length > 0) {
+          console.error('Failed adapters:', result.failedAdapters);
+        }
+        
+        // Refresh dashboard if any adapters were imported
+        if (result.successCount > 0) {
+          this.loadDashboardData();
+        }
+      },
+      error: (error) => {
+        console.error('Error importing adapters:', error);
+        this.notificationService.error(
+          'Import Failed',
+          error.message || 'Failed to import adapters. Please try again.'
+        );
+        this.isLoading = false;
+      }
+    });
   }
 }
