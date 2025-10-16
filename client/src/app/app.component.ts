@@ -6,11 +6,12 @@ import { LoadingService } from './core/services/loading.service';
 import { AuthService } from './core/services/auth.service';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ClickOutsideDirective } from './shared/directives/click-outside.directive';
+import { NotificationComponent } from './shared/components/notification/notification.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterModule, ClickOutsideDirective],
+  imports: [CommonModule, RouterOutlet, RouterModule, ClickOutsideDirective, NotificationComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
