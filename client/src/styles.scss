@@ -3,6 +3,161 @@
 /* Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ====== CUSTOM SCROLLBAR STYLES ====== */
+/* Light Theme Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+  margin: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+  border-radius: 10px;
+  border: 2px solid #f1f5f9;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #94a3b8, #64748b);
+  border-color: #e2e8f0;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #64748b, #475569);
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Scrollbar Corner (when both scrollbars are visible) */
+::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+
+/* Horizontal Scrollbar (same style as vertical) */
+::-webkit-scrollbar:horizontal {
+  height: 10px;
+}
+
+/* Thin Scrollbar for Compact Areas */
+.scrollbar-thin {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+    border: 1px solid #f1f5f9;
+    
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+/* Hidden Scrollbar (still scrollable) */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Overlay Scrollbar (appears on hover) */
+.scrollbar-overlay {
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 8px;
+    transition: background 0.3s ease;
+  }
+  
+  &:hover::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+/* Dark Theme Variants */
+.dark-theme {
+  .scrollbar-thin {
+    &::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-color: #0f172a;
+      
+      &:hover {
+        background: #475569;
+      }
+    }
+  }
+  
+  .scrollbar-overlay {
+    &:hover::-webkit-scrollbar-thumb {
+      background: #334155;
+      
+      &:hover {
+        background: #475569;
+      }
+    }
+  }
+}
+
+/* Dark Theme Scrollbar */
+.dark-theme {
+  ::-webkit-scrollbar-track {
+    background: #0f172a;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #334155, #1e293b);
+    border: 2px solid #0f172a;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #475569, #334155);
+    border-color: #1e293b;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #64748b, #475569);
+  }
+
+  /* Firefox Dark Theme */
+  * {
+    scrollbar-color: #334155 #0f172a;
+  }
+
+  /* Scrollbar Corner Dark */
+  ::-webkit-scrollbar-corner {
+    background: #0f172a;
+  }
+}
+
 /* CSS Variables for Professional Theme */
 :root {
   /* Primary Colors - Professional Blue Palette */
