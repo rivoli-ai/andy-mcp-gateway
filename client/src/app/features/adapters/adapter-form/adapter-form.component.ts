@@ -1,6 +1,6 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { McpAdapterService } from '../../../core/services/mcp-adapter.service';
 import { CreateMcpAdapter, UpdateMcpAdapter, McpAdapter, AdapterType, AdapterStatus } from '../../../core/models/mcp-adapter.model';
@@ -58,8 +58,25 @@ export class AdapterFormComponent implements OnInit {
       description: [''],
       type: ['', [Validators.required]],
       timeoutSeconds: [30, [Validators.min(1), Validators.max(300)]],
-      enabled: [true]
+      enabled: [true],
+      headers: this.fb.array([])
     });
+  }
+
+  get headers(): FormArray {
+    return this.adapterForm.get('headers') as FormArray;
+  }
+
+  addHeader(): void {
+    const headerGroup = this.fb.group({
+      key: ['', Validators.required],
+      value: ['', Validators.required]
+    });
+    this.headers.push(headerGroup);
+  }
+
+  removeHeader(index: number): void {
+    this.headers.removeAt(index);
   }
 
   loadAdapter(): void {
@@ -76,6 +93,19 @@ export class AdapterFormComponent implements OnInit {
           timeoutSeconds: adapter.timeoutSeconds,
           enabled: adapter.enabled
         });
+        
+        // Load headers
+        this.headers.clear();
+        if (adapter.headers) {
+          Object.entries(adapter.headers).forEach(([key, value]) => {
+            const headerGroup = this.fb.group({
+              key: [key, Validators.required],
+              value: [value, Validators.required]
+            });
+            this.headers.push(headerGroup);
+          });
+        }
+        
         this.isLoading = false;
       },
       error: (error) => {
@@ -95,6 +125,16 @@ export class AdapterFormComponent implements OnInit {
     this.submitError = null;
     const formValue = this.adapterForm.value;
 
+    // Convert headers array to dictionary
+    const headersDict: { [key: string]: string } = {};
+    if (formValue.headers && formValue.headers.length > 0) {
+      formValue.headers.forEach((header: { key: string; value: string }) => {
+        if (header.key && header.value) {
+          headersDict[header.key] = header.value;
+        }
+      });
+    }
+
     if (this.isEditMode) {
       const updateData: UpdateMcpAdapter = {
         name: formValue.name,
@@ -103,6 +143,7 @@ export class AdapterFormComponent implements OnInit {
         type: formValue.type,
         timeoutSeconds: formValue.timeoutSeconds,
         enabled: formValue.enabled,
+        headers: Object.keys(headersDict).length > 0 ? headersDict : undefined,
         updatedBy: 'current-user' // This should come from auth service
       };
       
@@ -125,6 +166,7 @@ export class AdapterFormComponent implements OnInit {
         type: formValue.type,
         timeoutSeconds: formValue.timeoutSeconds,
         enabled: formValue.enabled,
+        headers: Object.keys(headersDict).length > 0 ? headersDict : undefined,
         createdBy: 'current-user' // This should come from auth service
       };
       
@@ -148,6 +190,17 @@ export class AdapterFormComponent implements OnInit {
     }
   
     const formValue = this.adapterForm.value;
+    
+    // Convert headers array to dictionary
+    const headersDict: { [key: string]: string } = {};
+    if (formValue.headers && formValue.headers.length > 0) {
+      formValue.headers.forEach((header: { key: string; value: string }) => {
+        if (header.key && header.value) {
+          headersDict[header.key] = header.value;
+        }
+      });
+    }
+    
     const adapter: McpAdapter = {
       id: this.adapterId || '',
       name: formValue.name,
@@ -156,6 +209,7 @@ export class AdapterFormComponent implements OnInit {
       type: formValue.type,
       timeoutSeconds: formValue.timeoutSeconds,
       enabled: formValue.enabled,
+      headers: Object.keys(headersDict).length > 0 ? headersDict : undefined,
       isHealthy: false,
       status: AdapterStatus.Unknown,
       createdBy: '',
@@ -218,13 +272,30 @@ export class AdapterFormComponent implements OnInit {
     // Determine the endpoint based on the type (always use 'sse' for SSE, 'mcp' for StreamableHttp)
     const endpoint = adapterType === 'sse' ? 'sse' : 'mcp';
 
-    return `"${adapterName}": {
+    let code = `"${adapterName}": {
   "autoApprove": [],
   "disabled": ${disabled},
   "timeout": ${timeout},
   "type": "${adapterType}",
-  "url": "${apiUrl}/adapters/${adapterName}/${endpoint}"
-}`;
+  "url": "${apiUrl}/adapters/${adapterName}/${endpoint}"`;
+
+    // Add headers if they exist
+    if (formValue.headers && formValue.headers.length > 0) {
+      const validHeaders = formValue.headers.filter((h: any) => h.key && h.value);
+      if (validHeaders.length > 0) {
+        code += `,\n  "headers": {`;
+        validHeaders.forEach((header: any, index: number) => {
+          code += `\n    "${header.key}": "${header.value}"`;
+          if (index < validHeaders.length - 1) {
+            code += ',';
+          }
+        });
+        code += '\n  }';
+      }
+    }
+
+    code += '\n}';
+    return code;
   }
 
   private getAdapterTypeString(type: AdapterType | string | number): string {

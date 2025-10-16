@@ -25,6 +25,7 @@ public class DtosMapperProfile : Profile
             .ForMember(dest => dest.TimeoutSeconds, opt => opt.Condition(src => src.TimeoutSeconds.HasValue))
             .ForMember(dest => dest.Enabled, opt => opt.Condition(src => src.Enabled.HasValue))
             .ForMember(dest => dest.Type, opt => opt.Condition(src => src.Type.HasValue))
+            .ForMember(dest => dest.Headers, opt => opt.Condition(src => src.Headers != null))
             .ForMember(dest => dest.UpdatedBy, opt => opt.Condition(src => !string.IsNullOrEmpty(src.UpdatedBy)))
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())

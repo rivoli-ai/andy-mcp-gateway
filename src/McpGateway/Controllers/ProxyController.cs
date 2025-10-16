@@ -18,6 +18,7 @@ public class ProxyController(
     ILogger<ProxyController> logger)
     : ControllerBase
 {
+    [AllowAnonymous]
     [HttpGet("{adapterName}/sse")]
     public async Task<IActionResult> ForwardSseRequest(string adapterName)
     {
@@ -25,6 +26,7 @@ public class ProxyController(
         return ConvertProxyResult(result);
     }
 
+    [AllowAnonymous]
     [HttpPost("{name}/mcp")]
     [HttpGet("{name}/mcp")]
     public async Task<IActionResult> ForwardStreamableHttpRequest(string name, CancellationToken cancellationToken)
@@ -33,16 +35,18 @@ public class ProxyController(
         return ConvertProxyResult(result);
     }
 
+
     /// <summary>
     /// Forward messages to an MCP adapter
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("{adapterName}/messages")]
-    public async Task<IActionResult> SendMessages(string adapterName, [FromBody] JsonElement body)
+    public async Task<IActionResult> SendMessages(string adapterName)
     {
         try
         {
             var method = BuildMethodWithQueryString("messages");
-            var result = await proxyService.ForwardRequestAsync(adapterName, method, body, retry: true);
+            var result = await proxyService.ForwardRequestAsync(adapterName, HttpContext, method, retry: true);
             return ConvertProxyResult(result);
         }
         catch (Exception ex)
@@ -51,6 +55,28 @@ public class ProxyController(
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+
+    /// <summary>
+    /// Forward messages to an MCP adapter
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("{adapterName}/message")]
+    public async Task<IActionResult> SendMessage(string adapterName)
+    {
+        try
+        {
+            var method = BuildMethodWithQueryString("message");
+            var result = await proxyService.ForwardRequestAsync(adapterName,HttpContext, method, retry: true);
+            return ConvertProxyResult(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error forwarding messages to adapter {AdapterName}", adapterName);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
 
     private string BuildMethodWithQueryString(string method)
     {

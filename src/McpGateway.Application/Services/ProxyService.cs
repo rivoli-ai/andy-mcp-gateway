@@ -5,9 +5,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace McpGateway.Application.Services;
 
@@ -39,7 +44,7 @@ public class ProxyService(
 
         try
         {
- 
+
             ConfigureSseResponse(httpContext);
 
             using var client = CreateStreamingHttpClient();
@@ -89,7 +94,7 @@ public class ProxyService(
 
         try
         {
-      
+
             var proxiedRequest = CreateProxiedRequest(httpContext, uri => BuildAdapterUri(uri, adapter.Url));
 
             using var client = CreateStreamingHttpClient();
@@ -117,7 +122,7 @@ public class ProxyService(
     /// <param name="body">The JSON body to send</param>
     /// <param name="retry">Whether to enable retry logic</param>
     /// <returns>A ProxyResult containing the response from the adapter</returns>
-    public async Task<ProxyResult> ForwardRequestAsync(string adapterName, string endpoint, JsonElement body, bool retry = false)
+    public async Task<ProxyResult> ForwardRequestAsync(string adapterName, HttpContext context, string endpoint, bool retry = false)
     {
         var adapter = await GetValidatedAdapterAsync(adapterName);
         if (adapter == null)
@@ -131,8 +136,8 @@ public class ProxyService(
         }
 
         return retry
-            ? await ExecuteWithRetryAsync(() => SendPostRequestAsync(adapter, endpoint, body))
-            : await SendPostRequestAsync(adapter, endpoint, body);
+            ? await ExecuteWithRetryAsync(() => SendPostRequestAsync(adapter, context, endpoint))
+            : await SendPostRequestAsync(adapter, context, endpoint);
     }
 
     /// <summary>
@@ -473,8 +478,7 @@ public class ProxyService(
     {
         foreach (var header in context.Request.Headers)
         {
-            // Skip the inbound Authorization header for security
-            if (string.Equals(header.Key, HeaderNames.Authorization, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(header.Key, HeaderNames.Host, StringComparison.OrdinalIgnoreCase))
                 continue;
 
             if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, [.. header.Value]))
@@ -585,6 +589,7 @@ public class ProxyService(
     /// Builds a new URI by replacing the address portion while preserving the path structure.
     /// </summary>
     /// <param name="originalUri">The original URI</param>
+    /// <param name="body"></param>
     /// <param name="newAddress">The new base address</param>
     /// <returns>A URI with the new address and adjusted path</returns>
     private static Uri BuildAdapterUri(Uri originalUri, string newAddress)
@@ -619,7 +624,7 @@ public class ProxyService(
         var path = '/' + string.Join('/', segments.Skip(2));
 
         // Special handling for messages endpoint
-        if (path.EndsWith("/messages"))
+        if (path.EndsWith("/messages") || path.EndsWith("/message"))
         {
             path += "/";
         }
@@ -654,16 +659,18 @@ public class ProxyService(
     /// <param name="endpoint">The endpoint path</param>
     /// <param name="body">The JSON body to send</param>
     /// <returns>A ProxyResult containing the response</returns>
-    private async Task<ProxyResult> SendPostRequestAsync(McpAdapter adapter, string endpoint, JsonElement body)
+    private async Task<ProxyResult> SendPostRequestAsync(McpAdapter adapter, HttpContext context, string endpoint)
     {
         try
         {
-            var url = BuildAdapterEndpointUrl(adapter.Url, endpoint);
+            ConfigureSseResponse(context);
+            using var client = CreateStreamingHttpClient();
 
-            using var client = CreateHttpClient(adapter.TimeoutSeconds);
-            using var content = CreateJsonContent(body);
+            var proxiedRequest = CreateProxiedHttpRequestV2(context, uri => BuildAdapterUri(uri,adapter.Url));
 
-            using var response = await client.PostAsync(url, content);
+            var response = await client.SendAsync(proxiedRequest, CancellationToken.None);
+
+            await CopyProxiedHttpResponseV2Async(context, response, context.RequestAborted);
             return await ProcessHttpResponseAsync(response, adapter.Name);
         }
         catch (Exception ex)
@@ -676,6 +683,47 @@ public class ProxyService(
                 Error = $"Request failed: {ex.Message}"
             };
         }
+    }
+
+    public static HttpRequestMessage CreateProxiedHttpRequestV2(HttpContext context, Func<Uri, Uri>? targetOverride = null)
+    {
+       
+        var requestMessage = new HttpRequestMessage
+        {
+            Method = new HttpMethod(context.Request.Method),
+            RequestUri = targetOverride == null ? new Uri(context.Request.GetEncodedUrl()) : targetOverride(new Uri(context.Request.GetEncodedUrl())),
+            Content = new StreamContent(context.Request.Body) 
+        };
+
+        foreach (var header in context.Request.Headers)
+        {
+            // Skip the inbound Authorization header
+         
+
+            if (string.Equals(header.Key, HeaderNames.Host, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+
+            if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, [.. header.Value]))
+                requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, [.. header.Value]);
+        }
+        //requestMessage.Headers.Remove(HeaderNames.TransferEncoding);
+        requestMessage.Headers.TryAddWithoutValidation("Forwarded", $"for={context.Connection.RemoteIpAddress};proto={context.Request.Scheme};host={context.Request.Host.Value}");
+        return requestMessage;
+    }
+
+    private static Task CopyProxiedHttpResponseV2Async(HttpContext context, HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        context.Response.StatusCode = (int)response.StatusCode;
+
+        foreach (var header in response.Headers)
+            context.Response.Headers[header.Key] = header.Value.ToArray();
+        foreach (var header in response.Content.Headers)
+            context.Response.Headers[header.Key] = header.Value.ToArray();
+
+        context.Response.Headers.Remove(HeaderNames.TransferEncoding);
+
+        return response.Content.CopyToAsync(context.Response.Body, cancellationToken);
     }
 
     /// <summary>
@@ -935,7 +983,7 @@ public class ProxyService(
 
     /// <summary>
     /// Creates a generic ProxyResult with specified parameters.
-    /// </summary>
+    /// </summary>  var proxiedRequest = HttpProxy.CreateProxiedHttpRequest(HttpContext, (uri) => ReplaceUriAddress(uri, targetAddress));
     /// <param name="success">Whether the operation was successful</param>
     /// <param name="statusCode">The HTTP status code</param>
     /// <param name="content">The content or error message</param>

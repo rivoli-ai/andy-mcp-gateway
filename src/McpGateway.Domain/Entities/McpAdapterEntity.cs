@@ -31,6 +31,11 @@ public class McpAdapterEntity
 
     public AdapterType Type { get; set; } = AdapterType.StreamableHttp;
 
+    /// <summary>
+    /// Custom headers to include with requests to this adapter (stored as JSON)
+    /// </summary>
+    public string? Headers { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

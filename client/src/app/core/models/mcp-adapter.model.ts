@@ -6,6 +6,7 @@ export interface McpAdapter {
   timeoutSeconds: number;
   enabled: boolean;
   type: AdapterType | string | number; // Backend may return string, number, or enum
+  headers?: { [key: string]: string };
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -24,6 +25,7 @@ export interface CreateMcpAdapter {
   timeoutSeconds: number;
   enabled: boolean;
   type: AdapterType;
+  headers?: { [key: string]: string };
   createdBy?: string;
 }
 
@@ -34,6 +36,7 @@ export interface UpdateMcpAdapter {
   timeoutSeconds?: number;
   enabled?: boolean;
   type?: AdapterType;
+  headers?: { [key: string]: string };
   updatedBy?: string;
 }
 

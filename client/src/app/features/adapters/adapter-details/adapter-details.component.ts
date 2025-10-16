@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { MarkdownModule } from 'ngx-markdown';
 import { McpAdapterService } from '../../../core/services/mcp-adapter.service';
 import { McpAdapter, AdapterHealth, AdapterType } from '../../../core/models/mcp-adapter.model';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -13,6 +14,7 @@ import { environment } from '../../../../environments/environment';
   imports: [
     CommonModule,
     RouterModule,
+    MarkdownModule,
     LoadingSpinnerComponent,
     StatusBadgeComponent
   ],
@@ -102,13 +104,28 @@ export class AdapterDetailsComponent implements OnInit {
     // Determine the endpoint based on the type (always use 'sse' for SSE, 'mcp' for StreamableHttp)
     const endpoint = adapterType === 'sse' ? 'sse' : 'mcp';
 
-    return `"${this.adapter.name}": {
+    let code = `"${this.adapter.name}": {
   "autoApprove": [],
   "disabled": ${disabled},
   "timeout": ${timeout},
   "type": "${adapterType}",
-  "url": "${apiUrl}/adapters/${this.adapter.name}/${endpoint}"
-}`;
+  "url": "${apiUrl}/adapters/${this.adapter.name}/${endpoint}"`;
+
+    // Add headers if they exist
+    if (this.adapter.headers && Object.keys(this.adapter.headers).length > 0) {
+      code += `,\n  "headers": {`;
+      const headerEntries = Object.entries(this.adapter.headers);
+      headerEntries.forEach(([key, value], index) => {
+        code += `\n    "${key}": "${value}"`;
+        if (index < headerEntries.length - 1) {
+          code += ',';
+        }
+      });
+      code += '\n  }';
+    }
+
+    code += '\n}';
+    return code;
   }
 
   private getAdapterTypeString(type: AdapterType | string | number): string {
@@ -145,5 +162,13 @@ export class AdapterDetailsComponent implements OnInit {
     }).catch(err => {
       console.error('Failed to copy code:', err);
     });
+  }
+
+  getHeadersCount(headers: { [key: string]: string }): number {
+    return Object.keys(headers).length;
+  }
+
+  getHeadersArray(headers: { [key: string]: string }): Array<{ key: string; value: string }> {
+    return Object.entries(headers).map(([key, value]) => ({ key, value }));
   }
 }

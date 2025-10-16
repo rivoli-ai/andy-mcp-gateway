@@ -2,11 +2,11 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MarkdownModule } from 'ngx-markdown';
 import { McpAdapterService } from '../../../core/services/mcp-adapter.service';
 import { McpAdapter, AdapterStatus, AdapterType } from '../../../core/models/mcp-adapter.model';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-
 @Component({
   selector: 'app-adapters-list',
   standalone: true,
@@ -14,6 +14,7 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
     CommonModule,
     RouterModule,
     FormsModule,
+    MarkdownModule,
     LoadingSpinnerComponent,
     StatusBadgeComponent
   ],

@@ -87,7 +87,9 @@
         </div>
         
         <div class="card-body">
-          <p class="adapter-description" *ngIf="adapter.description">{{ adapter.description }}</p>
+          <div class="adapter-description" *ngIf="adapter.description">
+            <markdown>{{ adapter.description }}</markdown>
+          </div>
           
           <div class="adapter-meta">
             <div class="meta-item">
@@ -165,7 +167,9 @@
         <div class="list-item" *ngFor="let adapter of filteredAdapters">
         <div class="list-cell name-cell">
           <div class="adapter-name">{{ adapter.name }}</div>
-          <div class="adapter-description" *ngIf="adapter.description">{{ adapter.description }}</div>
+          <div class="adapter-description" *ngIf="adapter.description">
+            <markdown>{{ adapter.description }}</markdown>
+          </div>
         </div>
         
         <div class="list-cell url-cell">

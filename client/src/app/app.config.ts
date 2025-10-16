@@ -1,9 +1,10 @@
 import { ApplicationConfig, importProvidersFrom, APP_INITIALIZER } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@angular/common/http';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { provideAnimations } from '@angular/platform-browser/animations';
 import { MsalService, MsalGuard, MsalInterceptor, MsalBroadcastService, MSAL_INSTANCE, MSAL_GUARD_CONFIG, MSAL_INTERCEPTOR_CONFIG } from '@azure/msal-angular';
 import { PublicClientApplication, InteractionType, BrowserCacheLocation, LogLevel } from '@azure/msal-browser';
+import { MarkdownModule } from 'ngx-markdown';
 
 import { routes } from './app.routes';
 import { msalConfig, protectedResources } from '../auth-config';
@@ -88,6 +89,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes),
     provideHttpClient(withInterceptorsFromDi()),
+    importProvidersFrom(MarkdownModule.forRoot()),
     {
       provide: MSAL_INSTANCE,
       useFactory: MSALInstanceFactory,
@@ -114,6 +116,5 @@ export const appConfig: ApplicationConfig = {
       deps: [MsalService, MsalBroadcastService],
       multi: true,
     },
-    importProvidersFrom(BrowserAnimationsModule),
   ]
 };

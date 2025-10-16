@@ -61,15 +61,81 @@
           </div>
         </div>
 
-        <div class="form-field">
-          <label for="description" class="field-label">Description</label>
+        <div class="form-field full-width">
+          <label for="description" class="field-label">
+            Description
+            <span class="field-hint">(Supports Markdown formatting)</span>
+          </label>
           <textarea
             id="description"
             formControlName="description"
-            class="field-textarea"
-            placeholder="Enter adapter description (optional)"
-            rows="3"
+            class="field-textarea description-textarea"
+            placeholder="Enter adapter description (optional)&#10;&#10;You can use **bold**, *italic*, `code`, lists, links, and more using Markdown syntax."
+            rows="10"
           ></textarea>
+          <div class="field-help">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>This field supports Markdown. The description will be rendered with formatting in adapter cards and details.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Headers Section -->
+      <div class="form-section">
+        <div class="section-header-with-action">
+          <div>
+            <h2 class="section-title">Custom Headers</h2>
+            <p class="section-description">Add custom headers to include with requests to this adapter (optional)</p>
+          </div>
+          <button type="button" class="add-header-button" (click)="addHeader()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Add Header
+          </button>
+        </div>
+
+        <div class="headers-list" *ngIf="headers.length > 0">
+          <div class="header-item" *ngFor="let header of headers.controls; let i = index" [formGroup]="$any(header)">
+            <div class="header-inputs">
+              <div class="header-field">
+                <input
+                  type="text"
+                  formControlName="key"
+                  class="field-input header-key-input"
+                  placeholder="Header name (e.g., Authorization)"
+                  [class.field-error]="header.get('key')?.invalid && header.get('key')?.touched"
+                />
+              </div>
+              <div class="header-field">
+                <input
+                  type="text"
+                  formControlName="value"
+                  class="field-input header-value-input"
+                  placeholder="Header value"
+                  [class.field-error]="header.get('value')?.invalid && header.get('value')?.touched"
+                />
+              </div>
+              <button type="button" class="remove-header-button" (click)="removeHeader(i)" title="Remove header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="no-headers" *ngIf="headers.length === 0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+          </svg>
+          <p>No custom headers configured. Click "Add Header" to add custom HTTP headers to requests.</p>
         </div>
       </div>
 

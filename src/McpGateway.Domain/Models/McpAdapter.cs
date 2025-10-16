@@ -15,6 +15,7 @@ public class McpAdapter
     public int TimeoutSeconds { get; set; } = 30;
     public bool Enabled { get; set; } = true;
     public AdapterType Type { get; set; } = AdapterType.StreamableHttp;
+    public Dictionary<string, string>? Headers { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }

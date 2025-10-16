@@ -17,6 +17,7 @@ public class McpAdapterDto
     public bool Enabled { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AdapterType Type { get; set; }
+    public Dictionary<string, string>? Headers { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
@@ -41,6 +42,7 @@ public class CreateMcpAdapterDto
     public bool Enabled { get; set; } = true;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AdapterType Type { get; set; } = AdapterType.StreamableHttp;
+    public Dictionary<string, string>? Headers { get; set; }
     public string? CreatedBy { get; set; }
 }
 
@@ -57,6 +59,7 @@ public class UpdateMcpAdapterDto
     public bool? Enabled { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AdapterType? Type { get; set; }
+    public Dictionary<string, string>? Headers { get; set; }
     public string? UpdatedBy { get; set; }
 }
 

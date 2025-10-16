@@ -1,13 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { MarkdownModule } from 'ngx-markdown';
 import { McpAdapterService } from '../../core/services/mcp-adapter.service';
 import { AdapterList, AdapterStatus } from '../../core/models/mcp-adapter.model';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, MarkdownModule, StatusBadgeComponent],
   template: `
     <div class="dashboard">
       <!-- Header Section -->
@@ -105,14 +107,14 @@ import { AdapterList, AdapterStatus } from '../../core/models/mcp-adapter.model'
                 <p class="adapter-url">{{ adapter.url }}</p>
               </div>
               <div class="adapter-status">
-                <span class="badge" [ngClass]="getStatusClass(adapter.status)">
-                  {{ getStatusText(adapter.status) }}
-                </span>
+                <app-status-badge [status]="adapter.status"></app-status-badge>
               </div>
             </div>
             
             <div class="adapter-body" *ngIf="adapter.description">
-              <p class="adapter-description">{{ adapter.description }}</p>
+              <div class="adapter-description">
+                <markdown>{{ adapter.description }}</markdown>
+              </div>
             </div>
             
             <div class="adapter-footer">
@@ -406,6 +408,84 @@ import { AdapterList, AdapterStatus } from '../../core/models/mcp-adapter.model'
       color: var(--text-secondary);
       margin: 0;
       line-height: 1.5;
+      
+      // Limit to 3 lines with ellipsis
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      ::ng-deep {
+        p {
+          margin: 0 0 0.5rem 0;
+          &:last-child {
+            margin-bottom: 0;
+          }
+        }
+        
+        code {
+          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+          font-size: 0.8125rem;
+          background: #f1f5f9;
+          color: #475569;
+          padding: 0.125rem 0.375rem;
+          border-radius: 0.25rem;
+        }
+        
+        pre {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.375rem;
+          padding: 0.75rem;
+          overflow-x: auto;
+          margin: 0.5rem 0;
+          
+          code {
+            background: none;
+            padding: 0;
+          }
+        }
+        
+        strong {
+          font-weight: 600;
+          color: #475569;
+        }
+        
+        em {
+          font-style: italic;
+        }
+        
+        ul, ol {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+          
+          li {
+            margin: 0.25rem 0;
+          }
+        }
+        
+        a {
+          color: #3b82f6;
+          text-decoration: none;
+          
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+          margin: 0.75rem 0 0.5rem 0;
+          font-weight: 600;
+          line-height: 1.3;
+          color: #1e293b;
+        }
+        
+        h1 { font-size: 1.125rem; }
+        h2 { font-size: 1rem; }
+        h3 { font-size: 0.9375rem; }
+        h4, h5, h6 { font-size: 0.875rem; }
+      }
     }
 
     .adapter-footer {
@@ -608,31 +688,5 @@ export class DashboardComponent implements OnInit {
   getPercentage(value: number, total: number): number {
     if (total === 0) return 0;
     return Math.round((value / total) * 100);
-  }
-
-  getStatusClass(status: AdapterStatus): string {
-    switch (status) {
-      case AdapterStatus.Healthy:
-        return 'badge-success';
-      case AdapterStatus.Unhealthy:
-        return 'badge-error';
-      case AdapterStatus.Disabled:
-        return 'badge-warning';
-      default:
-        return 'badge-neutral';
-    }
-  }
-
-  getStatusText(status: AdapterStatus): string {
-    switch (status) {
-      case AdapterStatus.Healthy:
-        return 'Healthy';
-      case AdapterStatus.Unhealthy:
-        return 'Unhealthy';
-      case AdapterStatus.Disabled:
-        return 'Disabled';
-      default:
-        return 'Unknown';
-    }
   }
 }

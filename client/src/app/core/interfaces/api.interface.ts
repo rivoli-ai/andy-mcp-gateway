@@ -20,7 +20,6 @@ export interface IMcpAdapterService {
   checkAllAdaptersHealth(): Observable<AdapterHealth[]>;
   searchAdapters(name?: string, enabled?: boolean): Observable<AdapterList>;
   reloadMappings(): Observable<{ message: string; success: boolean }>;testConnection(adapter: McpAdapter): Observable<{ success: boolean; error?: string; tools?: any[] }>;
-  getAvailableTools(adapter: McpAdapter): Observable<{ tools: any[]; success: boolean; error?: string }>;
 }
 
 

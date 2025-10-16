@@ -114,6 +114,7 @@ public class AdaptersController : ControllerBase
                 return BadRequest(ModelState);
             }
 
+            // Health check is performed by the service before saving
             var adapter = await _adapterService.CreateAsync(dto);
             
             // Perform health check after creating the adapter
