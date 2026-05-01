@@ -36,6 +36,20 @@ builder.Services.AddSwaggerGen(options =>
 // Register services
 builder.Services.AddSingleton<IGatewayRegistryService, InMemoryGatewayRegistryService>();
 
+// MG1 routing core (rivoli-ai/andy-containers#241).
+// One concrete InMemoryServiceMapRegistry instance is shared by writer
+// (the file loader) and readers (the router, the health monitor, and
+// the diagnostic controller). The interface registration delegates to
+// the same instance so consumers get the same view.
+builder.Services.AddSingleton<InMemoryServiceMapRegistry>();
+builder.Services.AddSingleton<IServiceMapRegistry>(sp => sp.GetRequiredService<InMemoryServiceMapRegistry>());
+builder.Services.AddSingleton<IServiceRouter, ServiceRouter>();
+builder.Services.AddSingleton<RouteHealthMonitor>();
+builder.Services.AddSingleton<IRouteHealthMonitor>(sp => sp.GetRequiredService<RouteHealthMonitor>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RouteHealthMonitor>());
+builder.Services.AddHttpClient("route-probe");
+builder.Services.AddHostedService<ServiceMapFileLoader>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
