@@ -61,9 +61,66 @@ The project follows Clean Architecture principles with clear separation of conce
 
 ## Prerequisites
 
-- .NET 9.0 SDK
-- PostgreSQL 12+ (or Docker for PostgreSQL)
+- **.NET 10 SDK** (see `TargetFramework` in `backend/src/**/*.csproj`)
+- **Node.js 20+** and npm (for the Angular UI under `frontend/`)
+- **PostgreSQL 12+**, or **Docker** / **Docker Compose** to run the database and optional full stack
 - Visual Studio 2022 or VS Code (optional)
+
+## How to run
+
+### Option A: Docker Compose (PostgreSQL + API + Angular UI)
+
+From the repository root:
+
+1. Copy the environment template and adjust values (especially `JWT_SECRET_KEY` for anything beyond local dev):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start all services:
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. **UI:** [http://localhost:4201](http://localhost:4201) (default `FRONTEND_HOST_PORT`; nginx serves the SPA and proxies `/api`, `/adapters`, and `/health` to the API).
+4. **API only:** [http://localhost:8070](http://localhost:8070) (default `BACKEND_HOST_PORT`; the process still listens on **8080 inside the container**).
+
+If you change the host port mapped to the UI, set `API_URL` in `.env` to the same origin you use in the browser (for example `http://localhost:4201`), so MCP client URLs built in the SPA stay correct.
+
+Host port overrides (optional): `POSTGRES_HOST_PORT` (default **5434** on the host → **5432** in the container), `BACKEND_HOST_PORT` (default **8070**), `FRONTEND_HOST_PORT` (default **4201**); see `.env.example`. From your machine, Postgres is at **localhost:5434** when Compose is running with the defaults.
+
+**Postgres `28P01` / “password authentication failed”:** the data volume was initialized with different `DB_USER` / `DB_PASSWORD` than in your `.env` (the official image only applies `POSTGRES_*` on the first empty data directory). Fix by either setting `DB_*` to match that first init, or removing the volume and recreating: `docker compose down -v` then `docker compose up -d` (this **wipes the database**).
+
+To build only the API image (from repo root): `docker build -f backend/Dockerfile ./backend`
+
+### Option B: Local development (backend + frontend)
+
+1. **Database:** Run PostgreSQL locally and create a database named **`mcp_gateway`**, or override `ConnectionStrings__DefaultConnection` (defaults are in `backend/src/McpGateway/appsettings.json`).
+2. **Backend** (from repo root):
+
+   ```bash
+   dotnet run --project backend/src/McpGateway/McpGateway.csproj
+   ```
+
+   By default the HTTP profile listens at **http://localhost:5080** (`Properties/launchSettings.json`).
+
+3. **Frontend:**
+
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
+
+   The dev server is typically **http://localhost:4200**. Point the UI at your API (`environment` files and/or `public/assets/config/config.json`) so it matches the backend URL (often `http://localhost:5080`).
+
+### Tests
+
+```bash
+dotnet test backend/src/McpGateway.sln
+```
 
 ## Getting Started
 
@@ -71,46 +128,38 @@ The project follows Clean Architecture principles with clear separation of conce
 
 ```bash
 git clone <repository-url>
-cd GateWay
+cd andy-mcp-gateway
 ```
 
 ### 2. Database Setup
 
-#### Option A: Using Docker (Recommended)
+#### Option A: Using Docker (PostgreSQL only)
 
 ```bash
-docker run --name postgres-mcpgateway -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mcpgateway -p 5432:5432 -d postgres:15
+docker run --name postgres-mcpgateway -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mcp_gateway -p 5432:5432 -d postgres:16-alpine
 ```
 
 #### Option B: Local PostgreSQL Installation
 
 1. Install PostgreSQL on your system
-2. Create a database named `mcpgateway`
+2. Create a database named **`mcp_gateway`**
 3. Update the connection string in `appsettings.json` if needed
 
 ### 3. Configure Connection String
 
-Update the connection string in `src/McpGateway/appsettings.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=mcpgateway;Username=postgres;Password=postgres"
-  }
-}
-```
+Update the connection string in `backend/src/McpGateway/appsettings.json` if your database name or credentials differ.
 
 ### 4. Build and Run
 
 ```bash
-dotnet build
-dotnet run --project src/McpGateway
+dotnet build backend/src/McpGateway.sln
+dotnet run --project backend/src/McpGateway/McpGateway.csproj
 ```
 
-The API will be available at:
-- HTTP: `http://localhost:5000`
-- HTTPS: `https://localhost:5001`
-- Swagger UI: `https://localhost:5001/swagger`
+The API defaults (HTTP profile) are:
+- HTTP: `http://localhost:5080`
+- HTTPS profile (if used): `https://localhost:7082` and `http://localhost:5080`
+- Swagger UI: available when `ASPNETCORE_ENVIRONMENT=Development` (e.g. `http://localhost:5080/swagger`)
 
 ## API Endpoints
 
@@ -204,7 +253,7 @@ The application uses `appsettings.json` for configuration:
 ### Project Structure
 
 ```
-src/
+backend/src/
 ├── McpGateway.Domain/          # Domain layer
 │   ├── Entities/               # Database entities
 │   ├── Models/                 # Business objects
@@ -224,6 +273,8 @@ src/
     ├── Controllers/            # API controllers
     ├── Program.cs              # Application entry point
     └── appsettings.json        # Configuration
+
+frontend/                       # Angular SPA (management UI)
 ```
 
 ### Adding New Features
@@ -237,10 +288,10 @@ src/
 
 ```bash
 # Add migration
-dotnet ef migrations add MigrationName --project src/McpGateway.Infrastructure --startup-project src/McpGateway
+dotnet ef migrations add MigrationName --project backend/src/McpGateway.Infrastructure --startup-project backend/src/McpGateway
 
 # Update database
-dotnet ef database update --project src/McpGateway.Infrastructure --startup-project src/McpGateway
+dotnet ef database update --project backend/src/McpGateway.Infrastructure --startup-project backend/src/McpGateway
 ```
 
 ## Testing
@@ -248,7 +299,7 @@ dotnet ef database update --project src/McpGateway.Infrastructure --startup-proj
 ### Unit Tests
 
 ```bash
-dotnet test
+dotnet test backend/src/McpGateway.sln
 ```
 
 ### Integration Tests
@@ -261,24 +312,7 @@ dotnet test --filter Category=Integration
 
 ### Docker Deployment
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-WORKDIR /app
-EXPOSE 8080
-
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src
-COPY . .
-RUN dotnet build -c Release
-
-FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish
-
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "McpGateway.dll"]
-```
+Use **`backend/Dockerfile`** with **`docker compose up`** (see [How to run](#how-to-run)). The image targets **.NET 10** and listens on **8080** inside the container.
 
 ### Production Considerations
 
@@ -303,7 +337,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Inspired by Microsoft's [mcp-gateway](https://github.com/microsoft/mcp-gateway)
-- Built with .NET 9.0 and Clean Architecture principles
+- Built with .NET 10 and Clean Architecture principles
 - Uses PostgreSQL for data persistence
 
 

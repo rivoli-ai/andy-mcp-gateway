@@ -1,0 +1,296 @@
+<div class="page-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <button class="back-button" routerLink="/adapters">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Adapters
+      </button>
+      <div class="header-text">
+        <h1 class="page-title">{{ isEditMode ? 'Edit Adapter' : 'Create New Adapter' }}</h1>
+        <p class="page-description">
+          {{ isEditMode ? 'Update the adapter configuration below.' : 'Configure a new MCP adapter to connect to your services.' }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Section -->
+  <div class="form-container">
+    <form [formGroup]="adapterForm" (ngSubmit)="onSubmit()" class="adapter-form">
+      <!-- Basic Information Section -->
+      <div class="form-section">
+        <h2 class="section-title">Basic Information</h2>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="name" class="field-label">Name *</label>
+            <input
+              type="text"
+              id="name"
+              formControlName="name"
+              class="field-input"
+              placeholder="Enter adapter name"
+              [class.field-error]="adapterForm.get('name')?.invalid && adapterForm.get('name')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('name')?.hasError('required') && adapterForm.get('name')?.touched">
+              Name is required
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('name')?.hasError('minlength') && adapterForm.get('name')?.touched">
+              Name must be at least 3 characters long
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="url" class="field-label">URL *</label>
+            <input
+              type="url"
+              id="url"
+              formControlName="url"
+              class="field-input"
+              placeholder="https://example.com"
+              [class.field-error]="adapterForm.get('url')?.invalid && adapterForm.get('url')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('url')?.hasError('required') && adapterForm.get('url')?.touched">
+              URL is required
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('url')?.hasError('pattern') && adapterForm.get('url')?.touched">
+              Please enter a valid URL starting with http:// or https://
+            </div>
+          </div>
+        </div>
+
+        <div class="form-field full-width">
+          <label for="description" class="field-label">
+            Description
+            <span class="field-hint">(Supports Markdown formatting)</span>
+          </label>
+          <textarea
+            id="description"
+            formControlName="description"
+            class="field-textarea description-textarea"
+            placeholder="Enter adapter description (optional)&#10;&#10;You can use **bold**, *italic*, `code`, lists, links, and more using Markdown syntax."
+            rows="10"
+          ></textarea>
+          <div class="field-help">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>This field supports Markdown. The description will be rendered with formatting in adapter cards and details.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Headers Section -->
+      <div class="form-section">
+        <div class="section-header-with-action">
+          <div>
+            <h2 class="section-title">Custom Headers</h2>
+            <p class="section-description">Add custom headers to include with requests to this adapter (optional)</p>
+          </div>
+          <button type="button" class="add-header-button" (click)="addHeader()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Add Header
+          </button>
+        </div>
+
+        <div class="headers-list" *ngIf="headers.length > 0">
+          <div class="header-item" *ngFor="let header of headers.controls; let i = index" [formGroup]="$any(header)">
+            <div class="header-inputs">
+              <div class="header-field">
+                <input
+                  type="text"
+                  formControlName="key"
+                  class="field-input header-key-input"
+                  placeholder="Header name (e.g., Authorization)"
+                  [class.field-error]="header.get('key')?.invalid && header.get('key')?.touched"
+                />
+              </div>
+              <div class="header-field">
+                <input
+                  type="text"
+                  formControlName="value"
+                  class="field-input header-value-input"
+                  placeholder="Header value"
+                  [class.field-error]="header.get('value')?.invalid && header.get('value')?.touched"
+                />
+              </div>
+              <button type="button" class="remove-header-button" (click)="removeHeader(i)" title="Remove header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="no-headers" *ngIf="headers.length === 0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+          </svg>
+          <p>No custom headers configured. Click "Add Header" to add custom HTTP headers to requests.</p>
+        </div>
+      </div>
+
+      <!-- Configuration Section -->
+      <div class="form-section">
+        <h2 class="section-title">Configuration</h2>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="type" class="field-label">Type *</label>
+            <select
+              id="type"
+              formControlName="type"
+              class="field-select"
+              [class.field-error]="adapterForm.get('type')?.invalid && adapterForm.get('type')?.touched"
+            >
+              <option value="">Select adapter type</option>
+              <option [value]="AdapterType.StreamableHttp">Streamable HTTP</option>
+              <option [value]="AdapterType.Sse">Server-Sent Events (SSE)</option>
+            </select>
+            <div class="field-error-message" *ngIf="adapterForm.get('type')?.hasError('required') && adapterForm.get('type')?.touched">
+              Type is required
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="timeoutSeconds" class="field-label">Timeout (seconds)</label>
+            <input
+              type="number"
+              id="timeoutSeconds"
+              formControlName="timeoutSeconds"
+              class="field-input"
+              min="1"
+              max="300"
+              placeholder="30"
+              [class.field-error]="adapterForm.get('timeoutSeconds')?.invalid && adapterForm.get('timeoutSeconds')?.touched"
+            />
+            <div class="field-error-message" *ngIf="adapterForm.get('timeoutSeconds')?.hasError('min') && adapterForm.get('timeoutSeconds')?.touched">
+              Timeout must be at least 1 second
+            </div>
+            <div class="field-error-message" *ngIf="adapterForm.get('timeoutSeconds')?.hasError('max') && adapterForm.get('timeoutSeconds')?.touched">
+              Timeout cannot exceed 300 seconds
+            </div>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="checkbox-field">
+            <input
+              type="checkbox"
+              formControlName="enabled"
+              class="checkbox-input"
+            />
+            <span class="checkbox-label">Enable this adapter</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Integration Section -->
+      <div class="form-section" *ngIf="adapterForm.get('name')?.value && adapterForm.get('type')?.value">
+        <h2 class="section-title">Integration</h2>
+        <p class="section-description">Pick a client, then JSON or YAML.</p>
+        
+        <div class="integration-code-sample">
+          <div class="integration-code-sample__chrome">
+            <div class="integration-code-sample__client-tabs" role="tablist" aria-label="MCP client">
+              <button
+                *ngFor="let opt of integrationClientOptions"
+                type="button"
+                role="tab"
+                class="integration-code-tab"
+                [class.integration-code-tab--active]="integrationClient === opt.id"
+                [attr.aria-selected]="integrationClient === opt.id"
+                [title]="opt.label"
+                (click)="setIntegrationClient(opt.id)"
+              >
+                <span class="integration-code-tab-inner">
+                  <app-integration-client-tab-icon [clientId]="opt.id" />
+                  <span class="integration-code-tab-label">{{ opt.tabLabel }}</span>
+                </span>
+              </button>
+            </div>
+            <div class="integration-code-sample__toolbar">
+              <div class="integration-code-serde-toggle" role="group" aria-label="Format">
+                <button
+                  type="button"
+                  class="integration-code-serde-btn"
+                  [class.integration-code-serde-btn--active]="integrationSerde === 'json'"
+                  (click)="setIntegrationSerde('json')"
+                >
+                  JSON
+                </button>
+                <button
+                  type="button"
+                  class="integration-code-serde-btn"
+                  [class.integration-code-serde-btn--active]="integrationSerde === 'yaml'"
+                  (click)="setIntegrationSerde('yaml')"
+                >
+                  YAML
+                </button>
+              </div>
+              <button
+                type="button"
+                class="integration-code-sample__copy"
+                (click)="copyIntegrationCode()"
+                title="Copy to clipboard"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <div class="integration-code-sample__body">
+            <pre class="code-block"><code>{{ getIntegrationCode() }}</code></pre>
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- Submit Error -->
+      <div class="form-section" *ngIf="submitError">
+        <div class="submit-error">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <div class="error-content">
+            <strong>Failed to Save Adapter</strong>
+            <p>{{ submitError }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button
+          type="button"
+          class="action-button secondary"
+          (click)="onCancel()"
+          [disabled]="isSubmitting"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="action-button primary"
+          [disabled]="adapterForm.invalid || isSubmitting"
+        >
+          <app-loading-spinner *ngIf="isSubmitting" size="small"></app-loading-spinner>
+          {{ isSubmitting ? 'Saving...' : (isEditMode ? 'Update Adapter' : 'Create Adapter') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

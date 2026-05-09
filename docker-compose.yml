@@ -1,45 +1,67 @@
-version: '3.8'
-
 services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
+  # Credentials and DB name come from .env (defaults match appsettings.json; override to match appsettings.Development.json if desired).
+  # Host port maps container 5432 to POSTGRES_HOST_PORT on your machine. Backend uses Host=postgres;Port=5432 on the compose network.
   postgres:
-    image: postgres:15
-    container_name: mcpgateway-postgres
+    image: postgres:16-alpine
     environment:
-      POSTGRES_DB: mcpgateway
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-mcp_gateway}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - mcpgateway-network
-
-  mcpgateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: mcpgateway-app
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcpgateway;Username=postgres;Password=postgres
     ports:
-      - "8080:8080"
+      - "${POSTGRES_HOST_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-mcp_gateway}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Backend (.NET gateway) ───────────────────────────────────────────────────
+  mcpgateway-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
-      - postgres
-    networks:
-      - mcpgateway-network
+      postgres:
+        condition: service_healthy
+    # Compose interpolates ${...} from the project .env (see .env.example); no env_file so UI-only vars stay out of the API process.
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres;Port=5432;Database=${DB_NAME:-mcp_gateway};Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres};Pooling=true;
+      JWT__SecretKey: ${JWT_SECRET_KEY:-dev-secret-key-min-32-characters-long-for-security}
+      JWT__Issuer: ${JWT_ISSUER:-McpGateway}
+      JWT__Audience: ${JWT_AUDIENCE:-McpGateway}
+      AuthProviders__AzureAd__Enabled: ${AUTH_AZURE_ENABLED:-true}
+      AuthProviders__AzureAd__Type: FrontendOidc
+      # Defaults match appsettings.Development.json; override via .env for other tenants.
+      AuthProviders__AzureAd__Authority: ${AUTH_AZURE_AUTHORITY:-https://login.microsoftonline.com/1335991b-55a1-47b7-a4dd-177f429f0719/v2.0}
+      AuthProviders__AzureAd__ClientId: ${AUTH_AZURE_CLIENT_ID:-dec5414a-0f2f-43fa-9c58-e32f1f4a433b}
+      AuthProviders__AzureAd__SpaClientId: ${AUTH_AZURE_SPA_CLIENT_ID:-dec5414a-0f2f-43fa-9c58-e32f1f4a433b}
+      AuthProviders__AzureAd__TenantId: ${AUTH_AZURE_TENANT_ID:-1335991b-55a1-47b7-a4dd-177f429f0719}
+      AuthProviders__AzureAd__Scopes: ${AUTH_AZURE_SCOPES:-openid profile email User.Read}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BACKEND_HOST_PORT:-8070}:8080"
+
+  # ── Frontend (Angular + nginx) ────────────────────────────────────────────────
+  # Same pattern as andy-devpilot: nginx serves SPA and proxies /api + /adapters to the API.
+  mcpgateway-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - mcpgateway-backend
+    environment:
+      # Browser-visible API origin (MCP client uses absolute URLs). Match FRONTEND_HOST_PORT (default 4201).
+      API_URL: ${API_URL:-http://localhost:4201}
+    ports:
+      - "${FRONTEND_HOST_PORT:-4201}:80"
 
 volumes:
   postgres_data:
-
-networks:
-  mcpgateway-network:
-    driver: bridge
-
-
-
-
-
-
-

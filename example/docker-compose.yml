@@ -1,0 +1,45 @@
+# Run all sample MCP servers from the example/ directory:
+#   docker compose up
+#
+# Gateway on the host can use http://host.docker.internal:9101 (etc.) as adapter URLs.
+
+services:
+  streamable-calculator:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9101:9101"
+    command: >
+      sh -c "uv sync && uv run uvicorn servers.streamable_calculator:app --host 0.0.0.0 --port 9101"
+
+  streamable-knowledge:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9102:9102"
+    command: >
+      sh -c "uv sync && uv run uvicorn servers.streamable_knowledge:app --host 0.0.0.0 --port 9102"
+
+  sse-taskboard:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9103:9103"
+    command: >
+      sh -c "uv sync && uv run uvicorn servers.sse_taskboard:app --host 0.0.0.0 --port 9103"
+
+  streamable-orders:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9104:9104"
+    command: >
+      sh -c "uv sync && uv run uvicorn servers.streamable_orders:app --host 0.0.0.0 --port 9104"
