@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
-using McpGateway.Auth;
+using McpGateway.Application.Auth;
+using McpGateway.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -69,7 +70,6 @@ public class AuthController : ControllerBase
         try
         {
             var principal = await authProvider.ValidateTokenAsync(tokenToValidate!, cancellationToken);
-            var jwt = principal.Identity as JwtSecurityToken;
 
             // Extract basic identity info
             var sub = principal.FindFirst("oid")?.Value

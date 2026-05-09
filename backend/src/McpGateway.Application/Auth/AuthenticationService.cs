@@ -1,18 +1,18 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace McpGateway.Auth;
+namespace McpGateway.Application.Auth;
 
+/// <summary>Issues short-lived gateway JWTs after external OIDC validation (SPA login flow).</summary>
 public sealed class AuthenticationService
 {
     private readonly IConfiguration _configuration;
 
-    public AuthenticationService(IConfiguration configuration)
-    {
+    public AuthenticationService(IConfiguration configuration) =>
         _configuration = configuration;
-    }
 
     public string GenerateToken(string subjectId, string email, string? name = null)
     {
@@ -36,10 +36,8 @@ public sealed class AuthenticationService
             audience: audience,
             claims: claims,
             expires: DateTime.UtcNow.AddHours(8),
-            signingCredentials: creds
-        );
+            signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
-

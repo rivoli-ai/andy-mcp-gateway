@@ -1,13 +1,15 @@
-using McpGateway.Auth.Options;
+using McpGateway.Application.Auth;
+using McpGateway.Infrastructure.Auth;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace McpGateway.Auth;
+namespace McpGateway.Infrastructure;
 
-public static class AuthExtensions
+public static class AuthProviderServiceCollectionExtensions
 {
+    /// <summary>Binds <c>AuthProviders</c> and registers OIDC validation + gateway JWT minting for SPA login.</summary>
     public static IServiceCollection AddAuthProviders(this IServiceCollection services, IConfiguration configuration)
     {
-        // Bind dictionary-at-root (DevPilot style):
-        // "AuthProviders": { "AzureAd": { ... }, "Duende": { ... } }
         services.Configure<AuthProvidersOptions>(options =>
         {
             var section = configuration.GetSection(AuthProvidersOptions.SectionName);
@@ -20,4 +22,3 @@ public static class AuthExtensions
         return services;
     }
 }
-

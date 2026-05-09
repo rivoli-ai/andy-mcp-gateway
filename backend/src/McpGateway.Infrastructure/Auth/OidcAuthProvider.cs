@@ -1,16 +1,15 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using McpGateway.Auth.Options;
+using McpGateway.Application.Auth;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
-namespace McpGateway.Auth;
+namespace McpGateway.Infrastructure.Auth;
 
 /// <summary>
 /// Generic OIDC provider for frontend-delegated flows (Azure AD, Duende, etc.).
 /// The frontend obtains a token via OIDC; the backend validates the token using OIDC discovery.
-/// Mirrors the DevPilot approach.
 /// </summary>
 public sealed class OidcAuthProvider : IAuthProvider
 {
@@ -114,4 +113,3 @@ public sealed class OidcAuthProvider : IAuthProvider
         return Guid.TryParse(parts[0], out _) ? parts[0] : null;
     }
 }
-

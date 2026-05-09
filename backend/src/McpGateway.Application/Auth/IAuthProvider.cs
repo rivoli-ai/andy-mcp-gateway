@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace McpGateway.Auth;
+namespace McpGateway.Application.Auth;
 
 public interface IAuthProvider
 {
@@ -9,4 +9,3 @@ public interface IAuthProvider
 
     Task<ClaimsPrincipal> ValidateTokenAsync(string token, CancellationToken ct);
 }
-

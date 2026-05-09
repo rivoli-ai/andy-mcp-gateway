@@ -1,7 +1,7 @@
-using McpGateway.Auth.Options;
+using McpGateway.Application.Auth;
 using Microsoft.Extensions.Options;
 
-namespace McpGateway.Auth;
+namespace McpGateway.Infrastructure.Auth;
 
 public sealed class AuthProviderRegistry
 {
@@ -16,13 +16,10 @@ public sealed class AuthProviderRegistry
         {
             var type = (cfg.Type ?? "FrontendOidc").Trim();
             if (type.Equals("FrontendOidc", StringComparison.OrdinalIgnoreCase))
-            {
                 _providers[name] = new OidcAuthProvider(name, cfg);
-            }
         }
     }
 
-    public bool TryGetProvider(string name, out IAuthProvider? provider)
-        => _providers.TryGetValue(name, out provider);
+    public bool TryGetProvider(string name, out IAuthProvider? provider) =>
+        _providers.TryGetValue(name, out provider);
 }
-

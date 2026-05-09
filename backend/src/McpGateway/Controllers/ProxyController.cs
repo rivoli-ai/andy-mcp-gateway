@@ -1,20 +1,19 @@
 using System.Text.Json;
 using McpGateway.Application.Interfaces;
+using McpGateway.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace McpGateway.Controllers;
 
 [ApiController]
-[AllowAnonymous]
+[Authorize(Policy = McpTransportAuthorizationPolicy.Name)]
 [Route("adapters")]
 public class ProxyController(
     IProxyService proxyService,
-    IMcpAdapterService adapterService,
     ILogger<ProxyController> logger)
     : ControllerBase
 {
-    [AllowAnonymous]
     [HttpGet("{adapterName}/sse")]
     public async Task ForwardSseRequest(string adapterName)
     {
@@ -28,7 +27,6 @@ public class ProxyController(
         }
     }
 
-    [AllowAnonymous]
 [HttpPost("{name}/mcp")]
 [HttpGet("{name}/mcp")]
 public async Task ForwardStreamableHttpRequest(string name, CancellationToken cancellationToken)
@@ -60,7 +58,6 @@ public async Task ForwardStreamableHttpRequest(string name, CancellationToken ca
     /// <summary>
     /// Forward messages to an MCP adapter
     /// </summary>
-    [AllowAnonymous]
     [HttpPost("{adapterName}/messages")]
     public async Task SendMessages(string adapterName)
     {
@@ -87,7 +84,6 @@ public async Task ForwardStreamableHttpRequest(string name, CancellationToken ca
     /// <summary>
     /// Forward message to an MCP adapter
     /// </summary>
-    [AllowAnonymous]
     [HttpPost("{adapterName}/message")]
     public async Task SendMessage(string adapterName)
     {

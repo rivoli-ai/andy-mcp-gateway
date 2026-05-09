@@ -18,16 +18,14 @@ namespace McpGateway.Tests.Controllers;
 public class ProxyControllerTests
 {
     private readonly Mock<IProxyService> _mockProxyService;
-    private readonly Mock<IMcpAdapterService> _mockAdapterService;
     private readonly Mock<ILogger<ProxyController>> _mockLogger;
     private readonly ProxyController _controller;
 
     public ProxyControllerTests()
     {
         _mockProxyService = new Mock<IProxyService>();
-        _mockAdapterService = new Mock<IMcpAdapterService>();
         _mockLogger = new Mock<ILogger<ProxyController>>();
-        _controller = new ProxyController(_mockProxyService.Object, _mockAdapterService.Object, _mockLogger.Object);
+        _controller = new ProxyController(_mockProxyService.Object, _mockLogger.Object);
     }
 
     [Fact]

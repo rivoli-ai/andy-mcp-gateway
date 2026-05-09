@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpGateway", "McpGateway\Mc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpGateway.Tests", "McpGateway.Tests\McpGateway.Tests.csproj", "{EF84004C-81E3-49AF-BECC-1A358790F816}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpGateway.Authentication", "McpGateway.Authentication\McpGateway.Authentication.csproj", "{E878C8D5-9439-42AA-9DAC-134EA8959AE7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{EF84004C-81E3-49AF-BECC-1A358790F816}.Release|x64.Build.0 = Release|Any CPU
 		{EF84004C-81E3-49AF-BECC-1A358790F816}.Release|x86.ActiveCfg = Release|Any CPU
 		{EF84004C-81E3-49AF-BECC-1A358790F816}.Release|x86.Build.0 = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|x64.Build.0 = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Debug|x86.Build.0 = Debug|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|x64.ActiveCfg = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|x64.Build.0 = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|x86.ActiveCfg = Release|Any CPU
+		{E878C8D5-9439-42AA-9DAC-134EA8959AE7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
