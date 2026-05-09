@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace McpGateway.Controllers;
 
@@ -10,6 +11,7 @@ namespace McpGateway.Controllers;
 /// Provides REST endpoints for CRUD operations, health checking, and adapter management.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class AdaptersController : ControllerBase
 {

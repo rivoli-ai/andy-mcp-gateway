@@ -1,6 +1,7 @@
 using FluentAssertions;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
+using McpGateway.Application.Services;
 using McpGateway.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,13 +17,15 @@ public class AdaptersControllerTests
 {
     private readonly Mock<IMcpAdapterService> _mockService;
     private readonly Mock<ILogger<AdaptersController>> _mockLogger;
+    private readonly ExcelService _excelService;
     private readonly AdaptersController _controller;
 
     public AdaptersControllerTests()
     {
         _mockService = new Mock<IMcpAdapterService>();
         _mockLogger = new Mock<ILogger<AdaptersController>>();
-        _controller = new AdaptersController(_mockService.Object, _mockLogger.Object);
+        _excelService = new ExcelService();
+        _controller = new AdaptersController(_mockService.Object, _excelService, _mockLogger.Object);
     }
 
     [Fact]

@@ -21,6 +21,7 @@
     "@azure/msal-angular": "^4.0.20",
     "@azure/msal-browser": "^4.24.1",
     "@modelcontextprotocol/sdk": "^1.20.0",
+    "angular-auth-oidc-client": "^18.0.0",
     "marked": "^12.0.2",
     "ngx-markdown": "^18.0.0",
     "rxjs": "~7.8.0",

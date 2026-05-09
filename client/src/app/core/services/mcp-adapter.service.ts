@@ -1,9 +1,8 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Inject } from '@angular/core';
 import { from, Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
-import { HttpHeaders, HttpParams } from '@angular/common/http';
+import { catchError } from 'rxjs/operators';
+import { HttpParams } from '@angular/common/http';
 import { ApiService } from './api.service';
-import { MsalService } from '@azure/msal-angular';
 import { IMcpAdapterService } from '../interfaces/api.interface';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -16,8 +15,8 @@ import {
   AdapterList,
   AdapterType
 } from '../models/mcp-adapter.model';
-import { environment } from '../../../environments/environment';
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { APP_CONFIG, AppConfig } from './config.service';
 
 
 @Injectable({
@@ -25,10 +24,14 @@ import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 })
 export class McpAdapterService implements IMcpAdapterService {
   private readonly endpoint = '/api/adapters';
+  private readonly baseUrl: string;
 
-  private msalService = inject(MsalService);
-
-  constructor(private apiService: ApiService) {}
+  constructor(
+    private apiService: ApiService,
+    @Inject(APP_CONFIG) config: AppConfig
+  ) {
+    this.baseUrl = config.apiUrl;
+  }
 
   client = new Client({
     name: 'mcp-client',
@@ -121,13 +124,13 @@ export class McpAdapterService implements IMcpAdapterService {
   }
 
   private async testHttpAdapter(adapter: McpAdapter): Promise<{ success: boolean; error?: string; tools?: any }> {
-      const url = `${environment.apiUrl}/adapters/${adapter.name}/mcp`;
+      const url = `${this.baseUrl}/adapters/${adapter.name}/mcp`;
       const transport = new StreamableHTTPClientTransport(new URL(url),);
       return this.getTools(transport);
   }
 
   private async testSseAdapter(adapter: McpAdapter): Promise<{ success: boolean; error?: string; tools?: any }> {
-    const url = `${environment.apiUrl}/adapters/${adapter.name}/sse`;
+    const url = `${this.baseUrl}/adapters/${adapter.name}/sse`;
     const transport = new SSEClientTransport(new URL(url),);
     return this.getTools(transport);
   }

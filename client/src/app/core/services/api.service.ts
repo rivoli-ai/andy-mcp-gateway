@@ -1,17 +1,22 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
 import { IApiService } from '../interfaces/api.interface';
+import { APP_CONFIG, AppConfig } from './config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService implements IApiService {
-  private readonly baseUrl = environment.apiUrl;
+  private readonly baseUrl: string;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    @Inject(APP_CONFIG) config: AppConfig
+  ) {
+    this.baseUrl = config.apiUrl;
+  }
 
   get<T>(endpoint: string, params?: HttpParams): Observable<T> {
     return this.http.get<T>(`${this.baseUrl}${endpoint}`, { params })

@@ -23,6 +23,8 @@ import { AdapterStatus } from '../../../core/models/mcp-adapter.model';
       text-transform: uppercase;
       letter-spacing: 0.05em;
       white-space: nowrap;
+      border: none;
+      box-shadow: none;
     }
     
     .badge-success {

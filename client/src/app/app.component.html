@@ -1,117 +1,155 @@
 <!-- Login Page -->
-<div *ngIf="!isAuthenticated" class="login-wrapper">
+<div *ngIf="!auth.loggedIn()" class="login-wrapper">
   <router-outlet></router-outlet>
 </div>
 
 <!-- Main App -->
-<div *ngIf="isAuthenticated" class="app-container">
-  <!-- Sidebar -->
+<div *ngIf="auth.loggedIn()" class="app-container" [class.app-sidebar-collapsed]="sidebarCollapsed && !isNarrowViewport">
   <aside class="sidebar" [class.sidebar-collapsed]="sidebarCollapsed">
-    <div class="sidebar-header">
-      <div class="logo">
-        <div class="logo-icon">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
-            <path d="M8 12h16v2H8v-2zm0 4h16v2H8v-2zm0 4h12v2H8v-2z" fill="white"/>
-            <defs>
-              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#3b82f6"/>
-                <stop offset="100%" style="stop-color:#1d4ed8"/>
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <span class="logo-text" *ngIf="!sidebarCollapsed">MCP Gateway</span>
-      </div>
-      <button class="sidebar-toggle" (click)="toggleSidebar()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18M3 12h18M3 18h18"/>
-        </svg>
-      </button>
-    </div>
-    
-    <nav class="sidebar-nav">
-      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"/>
-          <rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/>
-          <rect x="3" y="14" width="7" height="7"/>
-        </svg>
-        <span *ngIf="!sidebarCollapsed">Dashboard</span>
-      </a>
-      
-      <a routerLink="/adapters" routerLinkActive="active" class="nav-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>
-        <span *ngIf="!sidebarCollapsed">Adapters</span>
-      </a>
-      
-    </nav>
-    
-    <div class="sidebar-footer">
-      <button class="theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'">
-        <svg *ngIf="!isDarkMode" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-        <svg *ngIf="isDarkMode" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-      </button>
-      
-      <div class="user-menu-sidebar" *ngIf="isAuthenticated" (clickOutside)="closeUserMenu()">
-        <button class="user-profile-sidebar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
-          <div class="user-avatar-sidebar">
-            <span class="user-initials">{{ getUserInitials() }}</span>
-          </div>
-          <div class="user-info-sidebar" *ngIf="!sidebarCollapsed">
-            <span class="user-name-sidebar">{{ currentUser?.name || 'User' }}</span>
-            <span class="user-email-sidebar">{{ currentUser?.username || currentUser?.email || '' }}</span>
-          </div>
-        </button>
-        
-        <div class="user-dropdown-sidebar" *ngIf="userMenuOpen && !sidebarCollapsed">
-          <button class="dropdown-item-sidebar" (click)="logout()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16,17 21,12 16,7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+    <header class="sidebar-header">
+      <div class="sidebar-header__top">
+        <a routerLink="/dashboard" class="sidebar-brand" title="Home">
+          <div class="sidebar-brand__mark" aria-hidden="true">
+            <svg class="logo-icon" width="22" height="22" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="url(#sidebarLogoGrad)"/>
+              <path d="M8 12h16v2H8v-2zm0 4h16v2H8v-2zm0 4h12v2H8v-2z" fill="white"/>
+              <defs>
+                <linearGradient id="sidebarLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#6366f1"/>
+                  <stop offset="50%" stop-color="#8b5cf6"/>
+                  <stop offset="100%" stop-color="#a855f7"/>
+                </linearGradient>
+              </defs>
             </svg>
-            <span>Logout</span>
+          </div>
+          <div class="sidebar-brand__text" *ngIf="!sidebarCollapsed">
+            <span class="sidebar-brand__name">MCP Gateway</span>
+            <span class="sidebar-brand__tagline">Control plane</span>
+          </div>
+        </a>
+        <button
+          type="button"
+          class="sidebar-collapse-toggle"
+          (click)="toggleSidebar()"
+          [attr.aria-label]="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          [attr.aria-expanded]="!sidebarCollapsed"
+          [title]="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        >
+          <svg *ngIf="sidebarCollapsed" class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="11 6 16 12 11 18"/>
+          </svg>
+          <svg *ngIf="!sidebarCollapsed" class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="13 6 8 12 13 18"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="sidebar-nav" aria-label="Main navigation">
+      <div class="nav-section">
+        <p class="nav-section-title" *ngIf="!sidebarCollapsed">Navigate</p>
+        <ul class="nav-list">
+          <li>
+            <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" aria-label="Dashboard">
+              <span class="nav-item__icon" aria-hidden="true">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="14" y="14" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </span>
+              <span class="nav-label" *ngIf="!sidebarCollapsed">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a routerLink="/adapters" routerLinkActive="active" class="nav-item" aria-label="Adapters">
+              <span class="nav-item__icon" aria-hidden="true">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              </span>
+              <span class="nav-label" *ngIf="!sidebarCollapsed">Adapters</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <footer class="sidebar-footer">
+      <div class="sidebar-user" [class.sidebar-user--collapsed]="sidebarCollapsed">
+        <div class="sidebar-user__avatar" [attr.title]="auth.user()?.name || auth.user()?.email || 'User'">
+          {{ getUserInitials() }}
+        </div>
+        <div class="sidebar-user__meta" *ngIf="!sidebarCollapsed">
+          <span class="sidebar-user__name">{{ auth.user()?.name || auth.user()?.email || 'User' }}</span>
+          <span class="sidebar-user__email">{{ auth.user()?.email || '' }}</span>
+        </div>
+      </div>
+      <button type="button" *ngIf="!sidebarCollapsed" class="logout-button" (click)="logout()">
+        <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16,17 21,12 16,7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>Sign out</span>
+      </button>
+      <button
+        type="button"
+        *ngIf="sidebarCollapsed"
+        class="logout-button logout-button--icon"
+        (click)="logout()"
+        title="Sign out"
+        aria-label="Sign out"
+      >
+        <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16,17 21,12 16,7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </footer>
+  </aside>
+
+  <div class="app-content">
+    <header class="header">
+      <div class="header-content">
+        <button type="button" class="menu-toggle" (click)="toggleSidebar()" aria-label="Toggle menu">
+          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div class="header-title">
+          <h1 class="page-title">{{ getPageTitle() }}</h1>
+        </div>
+        <div class="header-actions">
+          <button
+            type="button"
+            class="theme-toggle header-theme-toggle"
+            (click)="toggleTheme()"
+            [attr.aria-label]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+          >
+            <svg *ngIf="!isDarkMode" class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <svg *ngIf="isDarkMode" class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
           </button>
         </div>
       </div>
-    </div>
-  </aside>
-  
-  <!-- Main Content -->
-  <main class="main-content">
-    <!-- Top Bar -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <button class="mobile-menu-toggle" (click)="toggleSidebar()">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18M3 12h18M3 18h18"/>
-          </svg>
-        </button>
-        <h1 class="page-title">{{ getPageTitle() }}</h1>
-      </div>
-      
-      <div class="topbar-right">
-        <!-- Empty or can add other topbar actions -->
-      </div>
     </header>
-    
-    <!-- Page Content -->
+
     <div class="page-content">
       <div class="loading-overlay" *ngIf="isLoading">
         <div class="loading-spinner">
@@ -119,11 +157,15 @@
           <p>Loading...</p>
         </div>
       </div>
-      
       <router-outlet></router-outlet>
     </div>
-  </main>
+  </div>
+
+  <div
+    class="sidebar-overlay"
+    *ngIf="isNarrowViewport && !sidebarCollapsed"
+    (click)="closeSidebarDrawer()"
+  ></div>
 </div>
 
-<!-- Notification Component -->
 <app-notification></app-notification>

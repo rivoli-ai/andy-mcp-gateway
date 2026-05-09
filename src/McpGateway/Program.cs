@@ -8,8 +8,9 @@ using McpGateway.Infrastructure.Mapping;
 using Microsoft.EntityFrameworkCore;
 using McpGateway;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
-using ModelContextProtocol.AspNetCore.Authentication;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using McpGateway.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,25 +48,34 @@ builder.Services.AddScoped<IMcpAdapterRepository, McpAdapterRepository>();
 // Add HTTP Client
 builder.Services.AddHttpClient();
 
-var azureAdConfig = builder.Configuration.GetSection("AzureAd");
-builder.Services.AddAuthentication(options =>
+builder.Services.AddAuthProviders(builder.Configuration);
+
+// App JWT authentication (DevPilot-style): gateway issues its own JWT after validating external OIDC tokens.
+var secretKey = builder.Configuration["JWT:SecretKey"];
+if (string.IsNullOrWhiteSpace(secretKey))
 {
-    options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddScheme<McpAuthenticationOptions, McpSubPathAwareAuthenticationHandler>(
-    McpAuthenticationDefaults.AuthenticationScheme,
-    McpAuthenticationDefaults.DisplayName,
-    options =>
+    if (!builder.Environment.IsDevelopment())
+        throw new InvalidOperationException("JWT:SecretKey must be configured.");
+    secretKey = "dev-secret-key-min-32-characters-long-for-security";
+}
+
+var key = Encoding.ASCII.GetBytes(secretKey);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        options.ResourceMetadata = new()
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            Resource = new Uri(builder.Configuration.GetValue<string>("PublicOrigin")!),
-            AuthorizationServers = { new Uri($"https://login.microsoftonline.com/{azureAdConfig["TenantId"]}/v2.0") },
-            ScopesSupported = ["api://andy-back/Api.Access"]
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["JWT:Issuer"] ?? "McpGateway",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["JWT:Audience"] ?? "McpGateway",
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(2)
         };
-    })
-.AddMicrosoftIdentityWebApi(azureAdConfig);
+    });
 
 // Add logging with console output
 builder.Services.AddLogging(config =>
