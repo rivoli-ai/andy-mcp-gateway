@@ -1,144 +1,91 @@
-using Microsoft.AspNetCore.Mvc;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace McpGateway.Controllers;
 
 /// <summary>
-/// API Controller for managing MCP adapters.
-/// Provides REST endpoints for CRUD operations, health checking, and adapter management.
+/// REST API for managing MCP adapters: CRUD, health checks, search, and Excel import/export.
 /// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public class AdaptersController : ControllerBase
+public sealed class AdaptersController : ControllerBase
 {
-    private readonly IMcpAdapterService _adapterService;
-    private readonly ExcelService _excelService;
+    private const string ExcelMimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    private readonly IMcpAdapterService _adapters;
+    private readonly ExcelService _excel;
     private readonly ILogger<AdaptersController> _logger;
 
     public AdaptersController(
-        IMcpAdapterService adapterService, 
-        ExcelService excelService,
+        IMcpAdapterService adapters,
+        ExcelService excel,
         ILogger<AdaptersController> logger)
     {
-        _adapterService = adapterService;
-        _excelService = excelService;
+        _adapters = adapters;
+        _excel = excel;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all MCP adapters
-    /// </summary>
+    /// <summary>List all adapters with summary counts.</summary>
     [HttpGet]
-    public async Task<ActionResult<AdapterListDto>> GetAllAdapters()
-    {
-        try
-        {
-            var result = await _adapterService.GetAllAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving all adapters");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
+    public async Task<ActionResult<AdapterListDto>> GetAll() =>
+        await Execute(() => _adapters.GetAllAsync(), "Error retrieving all adapters");
 
-    /// <summary>
-    /// Get enabled MCP adapters only
-    /// </summary>
+    /// <summary>List enabled adapters only.</summary>
     [HttpGet("enabled")]
-    public async Task<ActionResult<AdapterListDto>> GetEnabledAdapters()
-    {
-        try
-        {
-            var result = await _adapterService.GetEnabledAsync();
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving enabled adapters");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
+    public async Task<ActionResult<AdapterListDto>> GetEnabled() =>
+        await Execute(() => _adapters.GetEnabledAsync(), "Error retrieving enabled adapters");
 
-    /// <summary>
-    /// Get adapter by ID
-    /// </summary>
+    /// <summary>Look up a single adapter by ID.</summary>
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<McpAdapterDto>> GetAdapterById(Guid id)
+    public async Task<ActionResult<McpAdapterDto>> GetById(Guid id)
     {
         try
         {
-            var adapter = await _adapterService.GetByIdAsync(id);
-            if (adapter == null)
-            {
-                return NotFound(new { error = $"Adapter with ID '{id}' not found" });
-            }
-            return Ok(adapter);
+            var adapter = await _adapters.GetByIdAsync(id);
+            return adapter is null
+                ? NotFound(new { error = $"Adapter with ID '{id}' not found" })
+                : Ok(adapter);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving adapter {Id}", id);
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error retrieving adapter {Id}", id);
         }
     }
 
-    /// <summary>
-    /// Get adapter by name
-    /// </summary>
+    /// <summary>Look up a single adapter by name.</summary>
     [HttpGet("name/{name}")]
-    public async Task<ActionResult<McpAdapterDto>> GetAdapterByName(string name)
+    public async Task<ActionResult<McpAdapterDto>> GetByName(string name)
     {
         try
         {
-            var adapter = await _adapterService.GetByNameAsync(name);
-            if (adapter == null)
-            {
-                return NotFound(new { error = $"Adapter with name '{name}' not found" });
-            }
-            return Ok(adapter);
+            var adapter = await _adapters.GetByNameAsync(name);
+            return adapter is null
+                ? NotFound(new { error = $"Adapter with name '{name}' not found" })
+                : Ok(adapter);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving adapter {Name}", name);
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error retrieving adapter {Name}", name);
         }
     }
 
-    /// <summary>
-    /// Create a new MCP adapter
-    /// </summary>
+    /// <summary>Create a new adapter and run an initial health check.</summary>
     [HttpPost]
-    public async Task<ActionResult<McpAdapterDto>> CreateAdapter([FromBody] CreateMcpAdapterDto dto)
+    public async Task<ActionResult<McpAdapterDto>> Create([FromBody] CreateMcpAdapterDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            // Health check is performed by the service before saving
-            var adapter = await _adapterService.CreateAsync(dto);
-            
-            // Perform health check after creating the adapter
-            try
-            {
-                var healthCheck = await _adapterService.CheckHealthAsync(adapter.Id);
-                _logger.LogInformation("Health check completed for newly created adapter {Name}: {Status}", 
-                    adapter.Name, healthCheck.Status);
-            }
-            catch (Exception healthEx)
-            {
-                _logger.LogWarning(healthEx, "Health check failed for newly created adapter {Name}", adapter.Name);
-                // Don't fail the creation if health check fails
-            }
-            
-            return CreatedAtAction(nameof(GetAdapterById), new { id = adapter.Id }, adapter);
+            var adapter = await _adapters.CreateAsync(dto);
+            await TryProbeHealthAsync(adapter.Id, adapter.Name, "newly created");
+            return CreatedAtAction(nameof(GetById), new { id = adapter.Id }, adapter);
         }
         catch (InvalidOperationException ex)
         {
@@ -146,39 +93,21 @@ public class AdaptersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating adapter");
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error creating adapter");
         }
     }
 
-    /// <summary>
-    /// Update an existing MCP adapter
-    /// </summary>
+    /// <summary>Update an existing adapter and re-run its health check.</summary>
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<McpAdapterDto>> UpdateAdapter(Guid id, [FromBody] UpdateMcpAdapterDto dto)
+    public async Task<ActionResult<McpAdapterDto>> Update(Guid id, [FromBody] UpdateMcpAdapterDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var adapter = await _adapterService.UpdateAsync(id, dto);
-            
-            // Perform health check after updating the adapter
-            try
-            {
-                var healthCheck = await _adapterService.CheckHealthAsync(id);
-                _logger.LogInformation("Health check completed for updated adapter {Name}: {Status}", 
-                    adapter.Name, healthCheck.Status);
-            }
-            catch (Exception healthEx)
-            {
-                _logger.LogWarning(healthEx, "Health check failed for updated adapter {Name}", adapter.Name);
-                // Don't fail the update if health check fails
-            }
-            
+            var adapter = await _adapters.UpdateAsync(id, dto);
+            await TryProbeHealthAsync(id, adapter.Name, "updated");
             return Ok(adapter);
         }
         catch (KeyNotFoundException ex)
@@ -191,43 +120,33 @@ public class AdaptersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating adapter {Id}", id);
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error updating adapter {Id}", id);
         }
     }
 
-    /// <summary>
-    /// Delete an MCP adapter
-    /// </summary>
+    /// <summary>Delete an adapter.</summary>
     [HttpDelete("{id:guid}")]
-    public async Task<ActionResult> DeleteAdapter(Guid id)
+    public async Task<ActionResult> Delete(Guid id)
     {
         try
         {
-            var result = await _adapterService.DeleteAsync(id);
-            if (!result)
-            {
-                return NotFound(new { error = $"Adapter with ID '{id}' not found" });
-            }
-            return NoContent();
+            return await _adapters.DeleteAsync(id)
+                ? NoContent()
+                : NotFound(new { error = $"Adapter with ID '{id}' not found" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting adapter {Id}", id);
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error deleting adapter {Id}", id);
         }
     }
 
-    /// <summary>
-    /// Check health status of a specific adapter
-    /// </summary>
+    /// <summary>Probe the health of a single adapter and persist the result.</summary>
     [HttpGet("{id:guid}/health")]
-    public async Task<ActionResult<AdapterHealthDto>> CheckAdapterHealth(Guid id)
+    public async Task<ActionResult<AdapterHealthDto>> CheckHealth(Guid id)
     {
         try
         {
-            var health = await _adapterService.CheckHealthAsync(id);
-            return Ok(health);
+            return Ok(await _adapters.CheckHealthAsync(id));
         }
         catch (KeyNotFoundException ex)
         {
@@ -235,139 +154,76 @@ public class AdaptersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking health for adapter {Id}", id);
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error checking health for adapter {Id}", id);
         }
     }
 
-    /// <summary>
-    /// Check health status of all adapters
-    /// </summary>
+    /// <summary>Probe the health of every enabled adapter and persist the results.</summary>
     [HttpPost("health-check")]
-    public async Task<ActionResult<IEnumerable<AdapterHealthDto>>> CheckAllAdaptersHealth()
-    {
-        try
-        {
-            var healthChecks = await _adapterService.CheckAllHealthAsync();
-            return Ok(healthChecks);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error checking health for all adapters");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
+    public async Task<ActionResult<IEnumerable<AdapterHealthDto>>> CheckAllHealth() =>
+        await Execute(() => _adapters.CheckAllHealthAsync(), "Error checking health for all adapters");
 
-    /// <summary>
-    /// Search adapters by name and/or enabled status
-    /// </summary>
+    /// <summary>Search adapters by name fragment and/or enabled flag.</summary>
     [HttpGet("search")]
-    public async Task<ActionResult<AdapterListDto>> SearchAdapters([FromQuery] string? name = null, [FromQuery] bool? enabled = null)
-    {
-        try
-        {
-            var result = await _adapterService.SearchAsync(name, enabled);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching adapters");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
+    public async Task<ActionResult<AdapterListDto>> Search([FromQuery] string? name = null, [FromQuery] bool? enabled = null) =>
+        await Execute(() => _adapters.SearchAsync(name, enabled), "Error searching adapters");
 
-    /// <summary>
-    /// Reload adapter mappings
-    /// </summary>
-    [HttpPost("reload")]
-    public async Task<ActionResult> ReloadMappings()
-    {
-        try
-        {
-            var result = await _adapterService.ReloadMappingsAsync();
-            return Ok(new { message = "Mappings reloaded successfully", success = result });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reloading mappings");
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
-
-    /// <summary>
-    /// Export all adapters to Excel file
-    /// </summary>
+    /// <summary>Stream all adapters as an Excel workbook.</summary>
     [HttpGet("export")]
-    public async Task<ActionResult> ExportAdaptersToExcel()
+    public async Task<ActionResult> Export()
     {
         try
         {
-            var adapters = await _adapterService.GetAllAsync();
-            
-            if (adapters.Adapters == null || !adapters.Adapters.Any())
-            {
+            var list = await _adapters.GetAllAsync();
+            if (list.Adapters is null || !list.Adapters.Any())
                 return BadRequest(new { error = "No adapters to export" });
-            }
 
-            var excelData = _excelService.ExportAdaptersToExcel(adapters.Adapters);
-            
+            var bytes = _excel.ExportAdaptersToExcel(list.Adapters);
             var fileName = $"MCP_Adapters_Export_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
-            
-            return File(excelData, 
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                fileName);
+            return File(bytes, ExcelMimeType, fileName);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error exporting adapters to Excel");
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error exporting adapters to Excel");
         }
     }
 
-    /// <summary>
-    /// Import adapters from Excel file
-    /// </summary>
+    /// <summary>Bulk-create adapters from an uploaded Excel workbook.</summary>
     [HttpPost("import")]
-    public async Task<ActionResult> ImportAdaptersFromExcel(IFormFile file)
+    public async Task<ActionResult> Import(IFormFile file)
     {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "No file uploaded" });
+
+        if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "File must be an Excel (.xlsx) file" });
+
         try
         {
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest(new { error = "No file uploaded" });
-            }
+            await using var stream = file.OpenReadStream();
+            var (adapters, errors) = _excel.ImportAdaptersFromExcel(stream);
 
-            if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest(new { error = "File must be an Excel (.xlsx) file" });
-            }
-
-            using var stream = file.OpenReadStream();
-            var (adapters, errors) = _excelService.ImportAdaptersFromExcel(stream);
-
-            if (errors.Any() && !adapters.Any())
-            {
+            if (errors.Count > 0 && adapters.Count == 0)
                 return BadRequest(new { error = "Import failed", errors });
-            }
 
+            var failed = new List<object>();
             var successCount = 0;
-            var failedAdapters = new List<object>();
 
-            foreach (var adapter in adapters)
+            foreach (var dto in adapters)
             {
                 try
                 {
-                    await _adapterService.CreateAsync(adapter);
+                    await _adapters.CreateAsync(dto);
                     successCount++;
                 }
                 catch (InvalidOperationException ex)
                 {
-                    failedAdapters.Add(new { name = adapter.Name, error = ex.Message });
+                    failed.Add(new { name = dto.Name, error = ex.Message });
                 }
                 catch (Exception ex)
                 {
-                    failedAdapters.Add(new { name = adapter.Name, error = "Failed to create adapter" });
-                    _logger.LogError(ex, "Error creating adapter {Name} during import", adapter.Name);
+                    failed.Add(new { name = dto.Name, error = "Failed to create adapter" });
+                    _logger.LogError(ex, "Error creating adapter {Name} during import", dto.Name);
                 }
             }
 
@@ -375,15 +231,46 @@ public class AdaptersController : ControllerBase
             {
                 message = $"Import completed. {successCount} adapters imported successfully.",
                 successCount,
-                failedCount = failedAdapters.Count,
+                failedCount = failed.Count,
                 validationErrors = errors,
-                failedAdapters
+                failedAdapters = failed
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error importing adapters from Excel");
-            return StatusCode(500, new { error = "Internal server error" });
+            return InternalError(ex, "Error importing adapters from Excel");
+        }
+    }
+
+    private async Task<ActionResult<T>> Execute<T>(Func<Task<T>> action, string errorContext)
+    {
+        try
+        {
+            return Ok(await action());
+        }
+        catch (Exception ex)
+        {
+            return InternalError(ex, errorContext);
+        }
+    }
+
+    private ObjectResult InternalError(Exception ex, string messageTemplate, params object?[] args)
+    {
+        _logger.LogError(ex, messageTemplate, args);
+        return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Internal server error" });
+    }
+
+    private async Task TryProbeHealthAsync(Guid adapterId, string adapterName, string adjective)
+    {
+        try
+        {
+            var health = await _adapters.CheckHealthAsync(adapterId);
+            _logger.LogInformation("Health check completed for {Adjective} adapter {Name}: {Status}",
+                adjective, adapterName, health.Status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Health check failed for {Adjective} adapter {Name}", adjective, adapterName);
         }
     }
 }

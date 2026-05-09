@@ -1,11 +1,9 @@
 using McpGateway.Application.DTOs;
-using McpGateway.Domain.Enums;
 
 namespace McpGateway.Application.Interfaces;
 
 /// <summary>
-/// Service interface for managing MCP adapters.
-/// Provides business logic operations for adapter management, health checking, and CRUD operations.
+/// Application service for MCP adapter management: CRUD, health checks, search.
 /// </summary>
 public interface IMcpAdapterService
 {
@@ -19,5 +17,4 @@ public interface IMcpAdapterService
     Task<AdapterHealthDto> CheckHealthAsync(Guid id);
     Task<IEnumerable<AdapterHealthDto>> CheckAllHealthAsync();
     Task<AdapterListDto> SearchAsync(string? name = null, bool? enabled = null);
-    Task<bool> ReloadMappingsAsync();
 }

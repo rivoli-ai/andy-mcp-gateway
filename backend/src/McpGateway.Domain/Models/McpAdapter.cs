@@ -3,8 +3,8 @@ using McpGateway.Domain.Enums;
 namespace McpGateway.Domain.Models;
 
 /// <summary>
-/// Domain model representing an MCP (Model Context Protocol) adapter.
-/// Contains business logic for adapter health management and status tracking.
+/// Domain model for an MCP (Model Context Protocol) adapter — the configuration and
+/// last-known health state of an upstream server the gateway can proxy to.
 /// </summary>
 public class McpAdapter
 {
@@ -21,24 +21,11 @@ public class McpAdapter
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
     public DateTime? LastHealthCheck { get; set; }
-    public bool IsHealthy { get; set; } = false;
+    public bool IsHealthy { get; set; }
     public int? LastResponseTimeMs { get; set; }
     public string? LastError { get; set; }
 
-    // Business logic methods
-    public bool IsReachable()
-    {
-        return Enabled && IsHealthy;
-    }
-
-    public void UpdateHealthStatus(bool isHealthy, int? responseTimeMs = null, string? error = null)
-    {
-        IsHealthy = isHealthy;
-        LastHealthCheck = DateTime.UtcNow;
-        LastResponseTimeMs = responseTimeMs;
-        LastError = error;
-    }
-
+    /// <summary>Stamps <see cref="UpdatedAt"/> with the current UTC time and records who triggered the update.</summary>
     public void MarkAsUpdated(string? updatedBy = null)
     {
         UpdatedAt = DateTime.UtcNow;

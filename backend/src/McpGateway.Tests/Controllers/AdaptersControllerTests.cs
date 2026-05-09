@@ -48,7 +48,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetAllAsync()).ReturnsAsync(adapterList);
 
         // Act
-        var result = await _controller.GetAllAdapters();
+        var result = await _controller.GetAll();
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -64,7 +64,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetAllAsync()).ThrowsAsync(new Exception("Service error"));
 
         // Act
-        var result = await _controller.GetAllAdapters();
+        var result = await _controller.GetAll();
 
         // Assert
         result.Result.Should().BeOfType<ObjectResult>();
@@ -92,7 +92,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetEnabledAsync()).ReturnsAsync(adapterList);
 
         // Act
-        var result = await _controller.GetEnabledAdapters();
+        var result = await _controller.GetEnabled();
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -116,7 +116,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetByIdAsync(id)).ReturnsAsync(adapter);
 
         // Act
-        var result = await _controller.GetAdapterById(id);
+        var result = await _controller.GetById(id);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -133,7 +133,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetByIdAsync(id)).ReturnsAsync((McpAdapterDto?)null);
 
         // Act
-        var result = await _controller.GetAdapterById(id);
+        var result = await _controller.GetById(id);
 
         // Assert
         result.Result.Should().BeOfType<NotFoundObjectResult>();
@@ -158,7 +158,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetByNameAsync(name)).ReturnsAsync(adapter);
 
         // Act
-        var result = await _controller.GetAdapterByName(name);
+        var result = await _controller.GetByName(name);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -175,7 +175,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.GetByNameAsync(name)).ReturnsAsync((McpAdapterDto?)null);
 
         // Act
-        var result = await _controller.GetAdapterByName(name);
+        var result = await _controller.GetByName(name);
 
         // Assert
         result.Result.Should().BeOfType<NotFoundObjectResult>();
@@ -213,13 +213,13 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.CreateAsync(createDto)).ReturnsAsync(createdAdapter);
 
         // Act
-        var result = await _controller.CreateAdapter(createDto);
+        var result = await _controller.Create(createDto);
 
         // Assert
         result.Result.Should().BeOfType<CreatedAtActionResult>();
         var createdAtResult = result.Result as CreatedAtActionResult;
         createdAtResult!.Value.Should().Be(createdAdapter);
-        createdAtResult.ActionName.Should().Be(nameof(_controller.GetAdapterById));
+        createdAtResult.ActionName.Should().Be(nameof(_controller.GetById));
         createdAtResult.RouteValues!["id"].Should().Be(createdAdapter.Id);
         _mockService.Verify(s => s.CreateAsync(createDto), Times.Once);
     }
@@ -232,7 +232,7 @@ public class AdaptersControllerTests
         _controller.ModelState.AddModelError("Name", "Name is required");
 
         // Act
-        var result = await _controller.CreateAdapter(createDto);
+        var result = await _controller.Create(createDto);
 
         // Assert
         result.Result.Should().BeOfType<BadRequestObjectResult>();
@@ -256,7 +256,7 @@ public class AdaptersControllerTests
             .ThrowsAsync(new InvalidOperationException("Adapter with name 'Existing Adapter' already exists"));
 
         // Act
-        var result = await _controller.CreateAdapter(createDto);
+        var result = await _controller.Create(createDto);
 
         // Assert
         result.Result.Should().BeOfType<BadRequestObjectResult>();
@@ -295,7 +295,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.UpdateAsync(id, updateDto)).ReturnsAsync(updatedAdapter);
 
         // Act
-        var result = await _controller.UpdateAdapter(id, updateDto);
+        var result = await _controller.Update(id, updateDto);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -313,7 +313,7 @@ public class AdaptersControllerTests
         _controller.ModelState.AddModelError("Name", "Name is required");
 
         // Act
-        var result = await _controller.UpdateAdapter(id, updateDto);
+        var result = await _controller.Update(id, updateDto);
 
         // Assert
         result.Result.Should().BeOfType<BadRequestObjectResult>();
@@ -334,7 +334,7 @@ public class AdaptersControllerTests
             .ThrowsAsync(new KeyNotFoundException($"Adapter with ID '{id}' not found"));
 
         // Act
-        var result = await _controller.UpdateAdapter(id, updateDto);
+        var result = await _controller.Update(id, updateDto);
 
         // Assert
         result.Result.Should().BeOfType<NotFoundObjectResult>();
@@ -352,7 +352,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.DeleteAsync(id)).ReturnsAsync(true);
 
         // Act
-        var result = await _controller.DeleteAdapter(id);
+        var result = await _controller.Delete(id);
 
         // Assert
         result.Should().BeOfType<NoContentResult>();
@@ -367,7 +367,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.DeleteAsync(id)).ReturnsAsync(false);
 
         // Act
-        var result = await _controller.DeleteAdapter(id);
+        var result = await _controller.Delete(id);
 
         // Assert
         result.Should().BeOfType<NotFoundObjectResult>();
@@ -396,7 +396,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.CheckHealthAsync(id)).ReturnsAsync(healthDto);
 
         // Act
-        var result = await _controller.CheckAdapterHealth(id);
+        var result = await _controller.CheckHealth(id);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -414,7 +414,7 @@ public class AdaptersControllerTests
             .ThrowsAsync(new KeyNotFoundException($"Adapter with ID '{id}' not found"));
 
         // Act
-        var result = await _controller.CheckAdapterHealth(id);
+        var result = await _controller.CheckHealth(id);
 
         // Assert
         result.Result.Should().BeOfType<NotFoundObjectResult>();
@@ -437,7 +437,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.CheckAllHealthAsync()).ReturnsAsync(healthDtos);
 
         // Act
-        var result = await _controller.CheckAllAdaptersHealth();
+        var result = await _controller.CheckAllHealth();
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -465,7 +465,7 @@ public class AdaptersControllerTests
         _mockService.Setup(s => s.SearchAsync("Test", true)).ReturnsAsync(adapterList);
 
         // Act
-        var result = await _controller.SearchAdapters("Test", true);
+        var result = await _controller.Search("Test", true);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -474,20 +474,4 @@ public class AdaptersControllerTests
         _mockService.Verify(s => s.SearchAsync("Test", true), Times.Once);
     }
 
-    [Fact]
-    public async Task ReloadMappings_WhenSuccessful_ShouldReturnOkWithSuccessMessage()
-    {
-        // Arrange
-        _mockService.Setup(s => s.ReloadMappingsAsync()).ReturnsAsync(true);
-
-        // Act
-        var result = await _controller.ReloadMappings();
-
-        // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().NotBeNull();
-        okResult.StatusCode.Should().Be(200);
-        _mockService.Verify(s => s.ReloadMappingsAsync(), Times.Once);
-    }
 }

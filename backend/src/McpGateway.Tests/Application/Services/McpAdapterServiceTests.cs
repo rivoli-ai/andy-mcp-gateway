@@ -1,13 +1,11 @@
 using FluentAssertions;
 using McpGateway.Application.DTOs;
-using McpGateway.Application.Interfaces;
 using McpGateway.Application.Services;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using MapsterMapper;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace McpGateway.Tests.Application.Services;
 
@@ -363,15 +361,6 @@ public class McpAdapterServiceTests
         result.Total.Should().Be(1);
     }
 
-    [Fact]
-    public async Task ReloadMappingsAsync_ShouldReturnTrue()
-    {
-        // Act
-        var result = await _service.ReloadMappingsAsync();
-
-        // Assert
-        result.Should().BeTrue();
-    }
 }
 
 

@@ -1,17 +1,16 @@
 using MapsterMapper;
 using McpGateway.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using McpGateway.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace McpGateway.Infrastructure.Repositories;
 
 /// <summary>
-/// Repository implementation for MCP adapter data persistence.
-/// Provides Entity Framework-based implementation of adapter repository operations.
+/// Entity Framework Core implementation of <see cref="IMcpAdapterRepository"/>.
 /// </summary>
-public class McpAdapterRepository : IMcpAdapterRepository
+public sealed class McpAdapterRepository : IMcpAdapterRepository
 {
     private readonly McpGatewayDbContext _context;
     private readonly IMapper _mapper;
@@ -22,34 +21,30 @@ public class McpAdapterRepository : IMcpAdapterRepository
         _mapper = mapper;
     }
 
-    public async Task<McpAdapter?> GetByIdAsync(Guid id)
-    {
-        var entity = await _context.McpAdapters.FindAsync(id);
-        return entity != null ? _mapper.Map<McpAdapter>(entity) : null;
-    }
+    public async Task<McpAdapter?> GetByIdAsync(Guid id) =>
+        ToDomain(await _context.McpAdapters.FindAsync(id));
 
-    public async Task<McpAdapter?> GetByNameAsync(string name)
-    {
-        var entity = await _context.McpAdapters
-            .FirstOrDefaultAsync(a => a.Name.ToLower() == name.ToLower());
-        return entity != null ? _mapper.Map<McpAdapter>(entity) : null;
-    }
+    public async Task<McpAdapter?> GetByNameAsync(string name) =>
+        ToDomain(await _context.McpAdapters
+            .FirstOrDefaultAsync(a => a.Name.ToLower() == name.ToLower()));
 
-    public async Task<IEnumerable<McpAdapter>> GetAllAsync()
-    {
-        var entities = await _context.McpAdapters
-            .OrderBy(a => a.Name)
-            .ToListAsync();
-        return entities.Select(e => _mapper.Map<McpAdapter>(e));
-    }
+    public async Task<IEnumerable<McpAdapter>> GetAllAsync() =>
+        await ToDomainListAsync(_context.McpAdapters.OrderBy(a => a.Name));
 
-    public async Task<IEnumerable<McpAdapter>> GetEnabledAsync()
+    public async Task<IEnumerable<McpAdapter>> GetEnabledAsync() =>
+        await ToDomainListAsync(_context.McpAdapters.Where(a => a.Enabled).OrderBy(a => a.Name));
+
+    public async Task<IEnumerable<McpAdapter>> SearchAsync(string? name = null, bool? enabled = null)
     {
-        var entities = await _context.McpAdapters
-            .Where(a => a.Enabled)
-            .OrderBy(a => a.Name)
-            .ToListAsync();
-        return entities.Select(e => _mapper.Map<McpAdapter>(e));
+        var query = _context.McpAdapters.AsQueryable();
+
+        if (!string.IsNullOrEmpty(name))
+            query = query.Where(a => a.Name.Contains(name));
+
+        if (enabled.HasValue)
+            query = query.Where(a => a.Enabled == enabled.Value);
+
+        return await ToDomainListAsync(query.OrderBy(a => a.Name));
     }
 
     public async Task<McpAdapter> CreateAsync(McpAdapter adapter)
@@ -62,11 +57,8 @@ public class McpAdapterRepository : IMcpAdapterRepository
 
     public async Task<McpAdapter> UpdateAsync(McpAdapter adapter)
     {
-        var entity = await _context.McpAdapters.FindAsync(adapter.Id);
-        if (entity == null)
-        {
-            throw new KeyNotFoundException($"Adapter with ID '{adapter.Id}' not found");
-        }
+        var entity = await _context.McpAdapters.FindAsync(adapter.Id)
+            ?? throw new KeyNotFoundException($"Adapter with ID '{adapter.Id}' not found");
 
         _mapper.Map(adapter, entity);
         await _context.SaveChangesAsync();
@@ -76,54 +68,39 @@ public class McpAdapterRepository : IMcpAdapterRepository
     public async Task<bool> DeleteAsync(Guid id)
     {
         var entity = await _context.McpAdapters.FindAsync(id);
-        if (entity == null)
-        {
+        if (entity is null)
             return false;
-        }
 
         _context.McpAdapters.Remove(entity);
         await _context.SaveChangesAsync();
         return true;
     }
 
-    public async Task<bool> ExistsAsync(Guid id)
-    {
-        return await _context.McpAdapters.AnyAsync(a => a.Id == id);
-    }
+    public Task<bool> ExistsAsync(Guid id) =>
+        _context.McpAdapters.AnyAsync(a => a.Id == id);
 
-    public async Task<bool> ExistsByNameAsync(string name)
-    {
-        return await _context.McpAdapters.AnyAsync(a => a.Name.ToLower() == name.ToLower());
-    }
-
-    public async Task<IEnumerable<McpAdapter>> SearchAsync(string? name = null, bool? enabled = null)
-    {
-        var query = _context.McpAdapters.AsQueryable();
-
-        if (!string.IsNullOrEmpty(name))
-        {
-            query = query.Where(a => a.Name.Contains(name));
-        }
-
-        if (enabled.HasValue)
-        {
-            query = query.Where(a => a.Enabled == enabled.Value);
-        }
-
-        var entities = await query.OrderBy(a => a.Name).ToListAsync();
-        return entities.Select(e => _mapper.Map<McpAdapter>(e));
-    }
+    public Task<bool> ExistsByNameAsync(string name) =>
+        _context.McpAdapters.AnyAsync(a => a.Name.ToLower() == name.ToLower());
 
     public async Task UpdateHealthStatusAsync(Guid id, bool isHealthy, int? responseTimeMs = null, string? error = null)
     {
         var entity = await _context.McpAdapters.FindAsync(id);
-        if (entity != null)
-        {
-            entity.IsHealthy = isHealthy;
-            entity.LastHealthCheck = DateTime.UtcNow;
-            entity.LastResponseTimeMs = responseTimeMs;
-            entity.LastError = error;
-            await _context.SaveChangesAsync();
-        }
+        if (entity is null)
+            return;
+
+        entity.IsHealthy = isHealthy;
+        entity.LastHealthCheck = DateTime.UtcNow;
+        entity.LastResponseTimeMs = responseTimeMs;
+        entity.LastError = error;
+        await _context.SaveChangesAsync();
+    }
+
+    private McpAdapter? ToDomain(McpAdapterEntity? entity) =>
+        entity is null ? null : _mapper.Map<McpAdapter>(entity);
+
+    private async Task<List<McpAdapter>> ToDomainListAsync(IQueryable<McpAdapterEntity> query)
+    {
+        var entities = await query.ToListAsync();
+        return entities.Select(_mapper.Map<McpAdapter>).ToList();
     }
 }

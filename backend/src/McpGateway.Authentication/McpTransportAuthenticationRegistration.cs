@@ -1,5 +1,5 @@
+using McpGateway.Authentication.DependencyInjection;
 using McpGateway.Authentication.Internal;
-using Microsoft.AspNetCore.Builder;
 
 namespace McpGateway.Authentication;
 

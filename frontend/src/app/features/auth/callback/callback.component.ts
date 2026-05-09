@@ -137,6 +137,18 @@ export class CallbackComponent implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
+    // Guard against the AppComponent's `*ngIf="auth.loggedIn()"` shell swap re-mounting
+    // this component after the first successful token exchange. The URL still carries
+    // ?code= until the queued navigateByUrl('/') fires, so without this short-circuit
+    // we'd run a second checkAuth(), Entra would reject the redeemed code with
+    // AADSTS54005, and the "Authentication failed" card would flash for one frame
+    // before the navigation completes.
+    if (this.authService.isLoggedIn()) {
+      this.loading.set(false);
+      void this.router.navigateByUrl('/');
+      return;
+    }
+
     await this.authService.loadProviderConfig();
 
     const provider = this.route.snapshot.paramMap.get('provider') ?? '';

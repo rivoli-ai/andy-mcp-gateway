@@ -1,60 +1,44 @@
 using System.Text.Json;
-using McpGateway.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 
 namespace McpGateway.Application.Proxying;
 
 /// <summary>
-/// JSON and plain HTTP error payloads for proxy endpoints.
+/// Helpers for writing error payloads to a proxy response that may already be partially
+/// committed (SSE streams) or still buffered (regular HTTP).
 /// </summary>
 public static class McpProxyErrors
 {
+    /// <summary>
+    /// Best-effort write of an SSE <c>error</c> event. No-ops if the response has already
+    /// flushed headers or the connection is broken.
+    /// </summary>
     public static async Task TryWriteSseErrorEventAsync(HttpContext httpContext, string errorMessage)
     {
         if (httpContext.Response.HasStarted)
-        {
             return;
-        }
 
         try
         {
-            var errorData = JsonSerializer.Serialize(new { error = errorMessage });
-            var errorEvent = $"event: error\ndata: {errorData}\n\n";
-
-            await httpContext.Response.WriteAsync(errorEvent, httpContext.RequestAborted).ConfigureAwait(false);
+            var data = JsonSerializer.Serialize(new { error = errorMessage });
+            await httpContext.Response.WriteAsync($"event: error\ndata: {data}\n\n", httpContext.RequestAborted)
+                .ConfigureAwait(false);
             await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted).ConfigureAwait(false);
         }
         catch
         {
-            // Connection may already be broken.
+            // Connection may already be torn down — nothing useful we can do here.
         }
     }
 
+    /// <summary>Writes a JSON <c>{"error": ...}</c> body with the given status code, if the response is still buffered.</summary>
     public static async Task WriteJsonErrorAsync(HttpContext context, int statusCode, string message)
     {
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = statusCode;
-            context.Response.ContentType = "application/json";
-            var errorJson = JsonSerializer.Serialize(new { error = message });
-            await context.Response.WriteAsync(errorJson).ConfigureAwait(false);
-        }
+        if (context.Response.HasStarted)
+            return;
+
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = message })).ConfigureAwait(false);
     }
-
-    public static ProxyResult NotFound(string adapterName) =>
-        Error(404, $"Adapter '{adapterName}' not found");
-
-    public static ProxyResult DisabledAdapter(string adapterName) =>
-        Error(400, $"Adapter '{adapterName}' is disabled");
-
-    public static ProxyResult ServiceUnavailable(string message) =>
-        Error(503, message);
-
-    public static ProxyResult Error(int statusCode, string error) =>
-        new()
-        {
-            Success = false,
-            StatusCode = statusCode,
-            Error = error
-        };
 }

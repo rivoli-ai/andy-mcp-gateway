@@ -57,10 +57,6 @@ public class IMcpAdapterServiceTests
         interfaceType.GetMethod(nameof(IMcpAdapterService.SearchAsync))
             .Should().NotBeNull()
             .And.Subject.ReturnType.Should().Be(typeof(Task<AdapterListDto>));
-
-        interfaceType.GetMethod(nameof(IMcpAdapterService.ReloadMappingsAsync))
-            .Should().NotBeNull()
-            .And.Subject.ReturnType.Should().Be(typeof(Task<bool>));
     }
 
     [Fact]

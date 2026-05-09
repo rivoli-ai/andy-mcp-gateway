@@ -1,13 +1,10 @@
 using FluentAssertions;
-using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
 using McpGateway.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Text;
-using System.Text.Json;
 using Xunit;
 
 namespace McpGateway.Tests.Controllers;
@@ -156,13 +153,6 @@ public class ProxyControllerTests
     {
         // Arrange
         var adapterName = "test-adapter";
-        var body = JsonDocument.Parse("{\"message\": \"test\"}").RootElement;
-        var proxyResult = new ProxyResult
-        {
-            Success = true,
-            StatusCode = 200,
-            Content = "response"
-        };
 
         // Setup HTTP context with query string
         var request = new Mock<HttpRequest>();
@@ -186,30 +176,4 @@ public class ProxyControllerTests
         capturedMethod.Should().Be(expectedMethod);
     }
 
-    [Fact]
-    public void ConvertProxyResult_WhenSuccessWithJsonContent_ShouldReturnOkWithJsonContent()
-    {
-        // Note: This test is removed because it tests private methods
-        // The functionality is tested indirectly through the public methods
-        // that use ConvertProxyResult internally
-        Assert.True(true); // Placeholder to keep the test method
-    }
-
-    [Fact]
-    public void ConvertProxyResult_WhenSuccessWithStringContent_ShouldReturnOkWithStringContent()
-    {
-        // Note: This test is removed because it tests private methods
-        // The functionality is tested indirectly through the public methods
-        // that use ConvertProxyResult internally
-        Assert.True(true); // Placeholder to keep the test method
-    }
-
-    [Fact]
-    public void ConvertProxyResult_WhenUnsuccessful_ShouldReturnStatusCodeWithError()
-    {
-        // Note: This test is removed because it tests private methods
-        // The functionality is tested indirectly through the public methods
-        // that use ConvertProxyResult internally
-        Assert.True(true); // Placeholder to keep the test method
-    }
 }

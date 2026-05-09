@@ -139,7 +139,7 @@ public class DtosMapperProfileTests
         };
 
         // Act
-        DtoMappingRegister.ApplyPartialUpdate(dto, existingModel);
+        McpAdapterPartialUpdate.Apply(dto, existingModel);
 
         // Assert
         existingModel.Id.Should().NotBe(Guid.Empty); // Should not change
@@ -191,7 +191,7 @@ public class DtosMapperProfileTests
         };
 
         // Act
-        DtoMappingRegister.ApplyPartialUpdate(dto, existingModel);
+        McpAdapterPartialUpdate.Apply(dto, existingModel);
 
         // Assert
         existingModel.Name.Should().Be("Original Adapter"); // Should not change

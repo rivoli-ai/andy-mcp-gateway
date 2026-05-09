@@ -1,16 +1,13 @@
 using FluentAssertions;
-using McpGateway.Application.Interfaces;
 using McpGateway.Application.Proxying;
 using McpGateway.Application.Services;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Moq;
-using System.Text;
-using System.Text.Json;
-using Xunit;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Xunit;
 
 namespace McpGateway.Tests.Application.Services;
 
@@ -212,47 +209,3 @@ public class ProxyServiceTests
     }
 }
 
-/// <summary>
-/// Unit tests for the ProxyResult class.
-/// </summary>
-public class ProxyResultTests
-{
-    [Fact]
-    public void Constructor_ShouldInitializeWithDefaultValues()
-    {
-        // Act
-        var result = new ProxyResult();
-
-        // Assert
-        result.Success.Should().BeFalse();
-        result.StatusCode.Should().Be(0);
-        result.Content.Should().BeNull();
-        result.JsonContent.Should().BeNull();
-        result.Error.Should().BeNull();
-    }
-
-    [Theory]
-    [InlineData(true, 200, "Success", "Error message")]
-    [InlineData(false, 404, null, "Not found")]
-    [InlineData(false, 500, "Internal error", null)]
-    public void Properties_ShouldAcceptValidValues(bool success, int statusCode, string? content, string? error)
-    {
-        // Arrange
-        var result = new ProxyResult();
-        var jsonContent = JsonDocument.Parse("{\"test\": \"data\"}").RootElement;
-
-        // Act
-        result.Success = success;
-        result.StatusCode = statusCode;
-        result.Content = content;
-        result.JsonContent = jsonContent;
-        result.Error = error;
-
-        // Assert
-        result.Success.Should().Be(success);
-        result.StatusCode.Should().Be(statusCode);
-        result.Content.Should().Be(content);
-        result.JsonContent.Should().Be(jsonContent);
-        result.Error.Should().Be(error);
-    }
-}

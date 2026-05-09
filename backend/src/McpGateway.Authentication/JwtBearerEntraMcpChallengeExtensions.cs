@@ -12,7 +12,6 @@ internal static class JwtBearerEntraMcpChallengeExtensions
 {
     public static void AttachMcpResourceMetadataChallenge(JwtBearerOptions options)
     {
-        options.Events ??= new JwtBearerEvents();
         var priorChallenge = options.Events.OnChallenge;
         options.Events.OnChallenge = async context =>
         {

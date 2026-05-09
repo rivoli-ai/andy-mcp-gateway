@@ -5,12 +5,12 @@ using McpGateway.Application.Mapping;
 using McpGateway.Application.Proxying;
 using McpGateway.Application.Services;
 using McpGateway.Authentication;
+using McpGateway.Authentication.DependencyInjection;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Infrastructure;
 using McpGateway.Infrastructure.Data;
 using McpGateway.Infrastructure.Mapping;
 using McpGateway.Infrastructure.Repositories;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 
 namespace McpGateway;

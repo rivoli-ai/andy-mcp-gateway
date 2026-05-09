@@ -1,9 +1,6 @@
 using McpGateway.Authentication.Internal;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
-namespace McpGateway.Authentication;
+namespace McpGateway.Authentication.DependencyInjection;
 
 public static class McpTransportAuthenticationServiceCollectionExtensions
 {

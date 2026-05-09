@@ -1,5 +1,9 @@
 namespace McpGateway.Application.Auth;
 
+/// <summary>
+/// Configuration root for the SPA-login auth providers exposed at <c>/api/auth/{provider}/*</c>.
+/// Bound from the <c>AuthProviders</c> configuration section.
+/// </summary>
 public class AuthProvidersOptions
 {
     public const string SectionName = "AuthProviders";
@@ -10,6 +14,10 @@ public class AuthProvidersOptions
         Providers.Where(kv => kv.Value.Enabled);
 }
 
+/// <summary>
+/// One named auth provider — typically Microsoft Entra ID. Only OIDC frontend-delegated flows
+/// are supported today (<c>Type = "FrontendOidc"</c>).
+/// </summary>
 public class ProviderConfig
 {
     public bool Enabled { get; set; }
@@ -20,5 +28,4 @@ public class ProviderConfig
     public string? SpaClientId { get; set; }
     public string? Scopes { get; set; }
     public string? TenantId { get; set; }
-    public string? ProfileEndpoint { get; set; }
 }
