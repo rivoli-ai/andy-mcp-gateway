@@ -1,6 +1,7 @@
-using AutoMapper;
+using MapsterMapper;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
+using McpGateway.Application.Mapping;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -104,7 +105,7 @@ public class McpAdapterService : IMcpAdapterService
             }
         }
 
-        _mapper.Map(dto, existingAdapter);
+        DtoMappingRegister.ApplyPartialUpdate(dto, existingAdapter);
         existingAdapter.MarkAsUpdated(dto.UpdatedBy);
 
         var updatedAdapter = await _repository.UpdateAsync(existingAdapter);
@@ -211,19 +212,8 @@ public class McpAdapterService : IMcpAdapterService
     }
 
 
-    private McpAdapterDto MapToDto(McpAdapter adapter)
-    {
-        var dto = _mapper.Map<McpAdapterDto>(adapter);
-        dto.Status = GetAdapterStatus(adapter);
-        return dto;
-    }
-
-    private string GetAdapterStatus(McpAdapter adapter)
-    {
-        if (!adapter.Enabled) return "disabled";
-        if (!adapter.IsHealthy) return "unhealthy";
-        return "healthy";
-    }
+    private McpAdapterDto MapToDto(McpAdapter adapter) =>
+        _mapper.Map<McpAdapterDto>(adapter);
 
     private async Task<(bool isHealthy, int? responseTimeMs, string? error)> CheckAdapterHealth(McpAdapter adapter)
     {

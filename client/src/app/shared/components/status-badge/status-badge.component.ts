@@ -80,7 +80,7 @@ import { AdapterStatus } from '../../../core/models/mcp-adapter.model';
 })
 export class StatusBadgeComponent {
   @Input() status: AdapterStatus | string | number = AdapterStatus.Unknown;
-  
+
   AdapterStatus = AdapterStatus ;
 
   getStatusClass(): string {

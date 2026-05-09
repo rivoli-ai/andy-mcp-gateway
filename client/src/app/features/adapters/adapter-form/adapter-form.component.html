@@ -195,56 +195,60 @@
       
       <!-- Tools Section -->
       <div class="form-section" *ngIf="adapterForm.get('url')?.value && adapterForm.get('name')?.value && adapterForm.get('type')?.value">
-        <h2 class="section-title">Tools</h2>
-        <div class="tools-section">
-          <button 
-            type="button" 
-            class="tools-button" 
-            (click)="listTools()" 
+        <div class="section-header-with-action">
+          <div>
+            <h2 class="section-title">Tools</h2>
+            <p class="section-description">
+              Query the MCP server for tools exposed at the URL above (uses name, type, and any custom headers).
+            </p>
+          </div>
+          <button
+            type="button"
+            class="add-header-button"
+            (click)="listTools()"
             [disabled]="isListingTools || adapterForm.get('url')?.invalid || adapterForm.get('name')?.invalid || adapterForm.get('type')?.invalid">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
             </svg>
-            {{ isListingTools ? 'Loading...' : 'List Available Tools' }}
+            {{ isListingTools ? 'Loading…' : 'List available tools' }}
           </button>
-          
-          <div class="tools-result" *ngIf="toolsResult">
-            <div class="tools-success" *ngIf="toolsResult.success">
-              <div *ngIf="toolsResult.tools && toolsResult.tools.length > 0" class="tools-display">
-                <div class="tools-header">
-                  <div class="tools-title">
-                    <svg class="tools-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        </div>
+
+        <div class="tools-result" *ngIf="toolsResult">
+          <div class="tools-success" *ngIf="toolsResult.success">
+              <div *ngIf="toolsResult.tools && toolsResult.tools.length > 0" class="integration-container tools-result-panel">
+                <div class="code-header">
+                  <div class="code-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
                     </svg>
-                    <span>Available Tools</span>
+                    <span>Available tools</span>
                   </div>
-                  <div class="tools-count">{{ toolsResult.tools.length }}</div>
+                  <span class="tools-header-count">{{ toolsResult.tools.length }}</span>
                 </div>
-                
-                <div class="tools-list">
-                  <div *ngFor="let tool of toolsResult.tools; let i = index" class="tool-card">
-                    <div class="tool-header">
-                      <div class="tool-info">
-                        <h3 class="tool-name">{{ tool.name || tool.title || 'Unnamed Tool' }}</h3>
-                        <p *ngIf="tool.description" class="tool-description">{{ tool.description }}</p>
+                <div class="tools-list-body">
+                  <div *ngFor="let tool of toolsResult.tools" class="header-item tool-item">
+                    <div class="tool-item__main">
+                      <div class="tool-item__header">
+                        <div class="tool-item__info">
+                          <h3 class="tool-item__name">{{ tool.name || tool.title || 'Unnamed tool' }}</h3>
+                          <p *ngIf="tool.description" class="tool-item__description">{{ tool.description }}</p>
+                        </div>
+                        <span class="tool-schema-badge">{{ tool.inputSchema?.type || 'function' }}</span>
                       </div>
-                      <div class="tool-type">
-                        <span class="type-badge">{{ tool.inputSchema?.type || 'function' }}</span>
-                      </div>
-                    </div>
-                    
-                    <div *ngIf="tool.inputSchema && getSchemaProperties(tool.inputSchema).length > 0" class="tool-parameters">
-                      <div class="parameters-header">
-                        <span class="parameters-title">Parameters</span>
-                        <span class="parameters-count">{{ getSchemaProperties(tool.inputSchema).length }}</span>
-                      </div>
-                      <div class="parameters-list">
-                        <div *ngFor="let prop of getSchemaProperties(tool.inputSchema)" class="parameter-item">
-                          <div class="parameter-info">
-                            <code class="parameter-name">{{ prop.name }}</code>
-                            <span class="parameter-type">{{ prop.type }}</span>
+                      <div *ngIf="tool.inputSchema && getSchemaProperties(tool.inputSchema).length > 0" class="tool-parameters">
+                        <div class="parameters-header">
+                          <span class="parameters-title">Parameters</span>
+                          <span class="parameters-count">{{ getSchemaProperties(tool.inputSchema).length }}</span>
+                        </div>
+                        <div class="parameters-list">
+                          <div *ngFor="let prop of getSchemaProperties(tool.inputSchema)" class="parameter-item">
+                            <div class="parameter-info">
+                              <code class="parameter-name">{{ prop.name }}</code>
+                              <span class="parameter-type">{{ prop.type }}</span>
+                            </div>
+                            <div *ngIf="prop.required" class="parameter-required">Required</div>
                           </div>
-                          <div *ngIf="prop.required" class="parameter-required">Required</div>
                         </div>
                       </div>
                     </div>
@@ -261,7 +265,6 @@
               <span>Failed to load tools: {{ toolsResult.error }}</span>
             </div>
           </div>
-        </div>
       </div>
 
       <!-- Integration Section -->

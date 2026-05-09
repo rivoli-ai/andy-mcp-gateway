@@ -1,10 +1,10 @@
-using AutoMapper;
 using FluentAssertions;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Services;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
+using MapsterMapper;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -274,7 +274,6 @@ public class McpAdapterServiceTests
 
         _mockRepository.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(existingAdapter);
         _mockRepository.Setup(r => r.ExistsByNameAsync(updateDto.Name)).ReturnsAsync(false);
-        _mockMapper.Setup(m => m.Map(updateDto, existingAdapter));
         _mockRepository.Setup(r => r.UpdateAsync(existingAdapter)).ReturnsAsync(updatedAdapter);
         _mockMapper.Setup(m => m.Map<McpAdapterDto>(updatedAdapter)).Returns(dto);
 

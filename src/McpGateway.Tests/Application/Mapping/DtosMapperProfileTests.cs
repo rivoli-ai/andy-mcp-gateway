@@ -1,5 +1,6 @@
-using AutoMapper;
 using FluentAssertions;
+using Mapster;
+using MapsterMapper;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Mapping;
 using McpGateway.Domain.Models;
@@ -8,7 +9,7 @@ using Xunit;
 namespace McpGateway.Tests.Application.Mapping;
 
 /// <summary>
-/// Unit tests for the DtosMapperProfile AutoMapper configuration.
+/// Unit tests for Mapster DTO mapping configuration (<see cref="DtoMappingRegister"/>).
 /// </summary>
 public class DtosMapperProfileTests
 {
@@ -16,8 +17,15 @@ public class DtosMapperProfileTests
 
     public DtosMapperProfileTests()
     {
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<DtosMapperProfile>());
-        _mapper = configuration.CreateMapper();
+        var config = new TypeAdapterConfig();
+        new DtoMappingRegister().Register(config);
+        config.Compile();
+        _mapper = new ServiceMapper(new EmptyServiceProvider(), config);
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => null;
     }
     [Fact]
     public void Map_FromMcpAdapterToMcpAdapterDto_ShouldMapAllProperties()
@@ -131,7 +139,7 @@ public class DtosMapperProfileTests
         };
 
         // Act
-        _mapper.Map(dto, existingModel);
+        DtoMappingRegister.ApplyPartialUpdate(dto, existingModel);
 
         // Assert
         existingModel.Id.Should().NotBe(Guid.Empty); // Should not change
@@ -183,7 +191,7 @@ public class DtosMapperProfileTests
         };
 
         // Act
-        _mapper.Map(dto, existingModel);
+        DtoMappingRegister.ApplyPartialUpdate(dto, existingModel);
 
         // Assert
         existingModel.Name.Should().Be("Original Adapter"); // Should not change

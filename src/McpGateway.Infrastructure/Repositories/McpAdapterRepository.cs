@@ -1,10 +1,9 @@
-using AutoMapper;
+using MapsterMapper;
 using McpGateway.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using McpGateway.Infrastructure.Data;
-using McpGateway.Infrastructure.Mapping;
 
 namespace McpGateway.Infrastructure.Repositories;
 

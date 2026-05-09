@@ -1,10 +1,10 @@
-using AutoMapper;
 using FluentAssertions;
 using McpGateway.Domain.Entities;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using McpGateway.Infrastructure.Data;
 using McpGateway.Infrastructure.Repositories;
+using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;

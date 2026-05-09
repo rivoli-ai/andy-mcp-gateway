@@ -1,5 +1,6 @@
-using AutoMapper;
 using FluentAssertions;
+using Mapster;
+using MapsterMapper;
 using McpGateway.Domain.Entities;
 using McpGateway.Domain.Models;
 using McpGateway.Infrastructure.Mapping;
@@ -8,7 +9,7 @@ using Xunit;
 namespace McpGateway.Tests.Infrastructure.Mapping;
 
 /// <summary>
-/// Unit tests for the EntityMapperProfile AutoMapper configuration.
+/// Unit tests for Mapster entity mapping configuration (<see cref="EntityMappingRegister"/>).
 /// </summary>
 public class EntityMapperProfileTests
 {
@@ -16,15 +17,23 @@ public class EntityMapperProfileTests
 
     public EntityMapperProfileTests()
     {
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<EntityMapperProfile>());
-        _mapper = configuration.CreateMapper();
+        var config = new TypeAdapterConfig();
+        new EntityMappingRegister().Register(config);
+        config.Compile();
+        _mapper = new ServiceMapper(new EmptyServiceProvider(), config);
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => null;
     }
 
     [Fact]
-    public void Configuration_ShouldBeValid()
+    public void Configuration_ShouldCompile()
     {
-        // Act & Assert
-        _mapper.ConfigurationProvider.AssertConfigurationIsValid();
+        var config = new TypeAdapterConfig();
+        new EntityMappingRegister().Register(config);
+        config.Compile();
     }
 
     [Fact]

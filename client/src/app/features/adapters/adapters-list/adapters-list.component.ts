@@ -102,6 +102,18 @@ export class AdaptersListComponent implements OnInit {
     this.applyFilters();
   }
 
+  /** Grid cards: show top-right alert only when status is unhealthy. */
+  isAdapterUnhealthy(adapter: McpAdapter): boolean {
+    const s = adapter.status;
+    if (typeof s === 'string') {
+      return s.toLowerCase() === 'unhealthy';
+    }
+    if (typeof s === 'number') {
+      return s === AdapterStatus.Unhealthy;
+    }
+    return s === AdapterStatus.Unhealthy;
+  }
+
   toggleView(): void {
     this.viewMode = this.viewMode === 'grid' ? 'list' : 'grid';
   }

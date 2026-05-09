@@ -212,6 +212,54 @@
 /* Repository card – calm surface, single clear hierarchy */
 /* repo-card styles come from global `styles.scss` (DevPilot source of truth) */
 
+// Unhealthy — fixed top-right “fold” on grid cards (alert triangle + dot)
+.repo-card-unhealthy-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.375rem 0.375rem 0.5rem 0.5rem;
+  border: none;
+  border-bottom-left-radius: 14px;
+  background: linear-gradient(145deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
+  color: #fff;
+  box-shadow:
+    -4px 6px 16px rgba(220, 38, 38, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+
+  svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+  }
+}
+
+.repo-card--unhealthy .repo-card__top {
+  padding-right: 2.875rem;
+}
+
+.repo-card--unhealthy {
+  border-color: rgba(220, 38, 38, 0.38) !important;
+}
+
+:host-context(.dark-theme) .repo-card--unhealthy {
+  border-color: rgba(248, 113, 113, 0.42) !important;
+}
+
+:host-context(.dark-theme) .repo-card-unhealthy-corner {
+  background: linear-gradient(145deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
+  box-shadow:
+    -4px 6px 20px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 // ====== LIST VIEW ======
 .adapters-list {
   background: var(--surface-card);

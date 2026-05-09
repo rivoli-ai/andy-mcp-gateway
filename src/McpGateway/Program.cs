@@ -1,10 +1,12 @@
+using Mapster;
+using MapsterMapper;
 using McpGateway.Application.Interfaces;
-using McpGateway.Application.Services;
 using McpGateway.Application.Mapping;
+using McpGateway.Application.Services;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Infrastructure.Data;
-using McpGateway.Infrastructure.Repositories;
 using McpGateway.Infrastructure.Mapping;
+using McpGateway.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using McpGateway;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,8 +36,12 @@ builder.Services.AddDbContext<McpGatewayDbContext>(options =>
 
 Console.WriteLine($"[CONFIG] Database connection configured: {builder.Configuration.GetConnectionString("DefaultConnection")}");
 
-// Add AutoMapper
-builder.Services.AddAutoMapper(typeof(DtosMapperProfile), typeof(EntityMapperProfile));
+// Mapster (DTO ↔ domain ↔ entity mappings)
+var mapsterConfig = TypeAdapterConfig.GlobalSettings;
+new DtoMappingRegister().Register(mapsterConfig);
+new EntityMappingRegister().Register(mapsterConfig);
+builder.Services.AddSingleton(mapsterConfig);
+builder.Services.AddScoped<IMapper, ServiceMapper>();
 
 // Add Application Services
 builder.Services.AddScoped<IMcpAdapterService, McpAdapterService>();

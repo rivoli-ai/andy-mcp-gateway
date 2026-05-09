@@ -112,14 +112,29 @@
   <div class="content-section">
     <!-- Grid View -->
     <div class="adapters-grid" *ngIf="viewMode === 'grid'">
-      <div class="repo-card" *ngFor="let adapter of filteredAdapters">
+      <div
+        class="repo-card"
+        *ngFor="let adapter of filteredAdapters"
+        [class.repo-card--unhealthy]="isAdapterUnhealthy(adapter)">
+        <div
+          class="repo-card-unhealthy-corner"
+          *ngIf="isAdapterUnhealthy(adapter)"
+          role="img"
+          aria-label="Unhealthy: health check failed"
+          title="Unhealthy — health check failed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
         <div class="repo-card__top">
           <div class="repo-card__chips">
             <span class="repo-chip repo-chip--provider local">{{ adapter.type }}</span>
             <span class="repo-chip">
               {{ adapter.enabled ? 'Enabled' : 'Disabled' }}
             </span>
-            <app-status-badge [status]="adapter.status"></app-status-badge>
+            <app-status-badge *ngIf="!isAdapterUnhealthy(adapter)" [status]="adapter.status"></app-status-badge>
           </div>
         </div>
 
