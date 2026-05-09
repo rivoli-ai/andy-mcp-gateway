@@ -3,6 +3,7 @@ import { from, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { HttpParams } from '@angular/common/http';
 import { ApiService } from './api.service';
+import { AuthService } from './auth.service';
 import { IMcpAdapterService } from '../interfaces/api.interface';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -28,6 +29,7 @@ export class McpAdapterService implements IMcpAdapterService {
 
   constructor(
     private apiService: ApiService,
+    private authService: AuthService,
     @Inject(APP_CONFIG) config: AppConfig
   ) {
     this.baseUrl = config.apiUrl;
@@ -92,21 +94,21 @@ export class McpAdapterService implements IMcpAdapterService {
     return this.apiService.getBlob(`${this.endpoint}/export`);
   }
 
-  importAdaptersFromExcel(file: File): Observable<{ 
-    message: string; 
-    successCount: number; 
-    failedCount: number; 
-    validationErrors: string[]; 
-    failedAdapters: any[] 
+  importAdaptersFromExcel(file: File): Observable<{
+    message: string;
+    successCount: number;
+    failedCount: number;
+    validationErrors: string[];
+    failedAdapters: any[]
   }> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.apiService.postFormData<{ 
-      message: string; 
-      successCount: number; 
-      failedCount: number; 
-      validationErrors: string[]; 
-      failedAdapters: any[] 
+    return this.apiService.postFormData<{
+      message: string;
+      successCount: number;
+      failedCount: number;
+      validationErrors: string[];
+      failedAdapters: any[]
     }>(`${this.endpoint}/import`, formData);
   }
 
@@ -146,22 +148,41 @@ export class McpAdapterService implements IMcpAdapterService {
   }
 
   private async testHttpAdapter(adapter: McpAdapter): Promise<{ success: boolean; error?: string; tools?: any }> {
-      const url = `${this.baseUrl}/adapters/${adapter.name}/mcp`;
-      const transport = new StreamableHTTPClientTransport(new URL(url),);
-      return this.getTools(transport);
+    const url = `${this.baseUrl}/adapters/${adapter.name}/mcp`;
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: this.buildAuthHeaders() }
+    });
+    return this.getTools(transport);
   }
 
   private async testSseAdapter(adapter: McpAdapter): Promise<{ success: boolean; error?: string; tools?: any }> {
     const url = `${this.baseUrl}/adapters/${adapter.name}/sse`;
-    const transport = new SSEClientTransport(new URL(url),);
+    // The MCP SSE transport has two channels:
+    //   - GET /sse — held open as the event stream (browsers' native EventSource won't carry
+    //     a custom Authorization header; eventSourceInit only forwards `withCredentials`).
+    //   - POST /messages — outbound JSON-RPC messages (uses fetch, requestInit.headers works).
+    // We attach the gateway JWT to both, but for the GET stream the browser will silently
+    // drop it. If your gateway is gating /sse with Authorization-only auth, the request
+    // will 401 — accept `?access_token=` query-string fallback on the gateway, or add a
+    // server-side cookie for the SSE route.
+    const headers = this.buildAuthHeaders();
+    const transport = new SSEClientTransport(new URL(url), {
+      eventSourceInit: { withCredentials: false } as EventSourceInit,
+      requestInit: { headers }
+    });
     return this.getTools(transport);
   }
 
-
-  private async getTools(transport : Transport){
+  private async getTools(transport: Transport) {
     await this.client.connect(transport);
     const tools = await this.client.listTools();
     return { success: true, tools: tools.tools };
+  }
+
+  /** Returns the gateway-JWT bearer header, or an empty record if the user isn't signed in. */
+  private buildAuthHeaders(): Record<string, string> {
+    const token = this.authService.getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   private getEnumName(enumValue: AdapterType | undefined): string | undefined {

@@ -1,14 +1,14 @@
-// Microsoft Learn–style code sample: light chrome bar + dark editor body
+// Code sample: light chrome + theme-aware body (light panel in light mode, dark in .dark-theme)
 
 .integration-code-sample {
   margin-top: 1rem;
-  border: 1px solid #e1dfdd;
+  border: 1px solid var(--border-light, #e1dfdd);
   border-radius: 10px;
   overflow: hidden;
   box-shadow:
     0 0.3px 0.9px rgba(0, 0, 0, 0.06),
     0 1.6px 3.6px rgba(0, 0, 0, 0.08);
-  background: #1e1e1e;
+  background: var(--surface-card, #ffffff);
 }
 
 .integration-code-sample--in-card {
@@ -22,8 +22,8 @@
   gap: 0.5rem 0.75rem;
   min-height: 44px;
   padding: 0.35rem 0.5rem 0.35rem 0.35rem;
-  background: #faf9f8;
-  border-bottom: 1px solid #e1dfdd;
+  background: var(--surface-ground, #faf9f8);
+  border-bottom: 1px solid var(--border-light, #e1dfdd);
 }
 
 .integration-code-sample__client-tabs {
@@ -161,7 +161,7 @@
   margin: 0;
   overflow: auto;
   max-height: min(65vh, 480px);
-  background: #1e1e1e;
+  background: var(--surface-ground, #f6f8fa);
 }
 
 .integration-code-sample__body .code-block {
@@ -183,13 +183,14 @@
   tab-size: 2;
 
   code {
-    color: #d4d4d4;
+    color: var(--text-primary, #1f2328);
     white-space: pre;
   }
 }
 
 :host-context(.dark-theme) {
   .integration-code-sample {
+    background: #1e1e1e;
     border-color: rgba(148, 163, 184, 0.22);
     box-shadow: none;
   }
