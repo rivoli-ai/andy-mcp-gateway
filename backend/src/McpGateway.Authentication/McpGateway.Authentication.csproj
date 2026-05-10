@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\McpGateway.Application\McpGateway.Application.csproj" />
+    <ProjectReference Include="..\McpGateway.Domain\McpGateway.Domain.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using McpGateway.Application.Auth;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,15 @@ internal static class McpTransportAuthenticationWebRegistrar
     {
         AddJwtAndMcpAuthentication(services, state);
         AddAuthorizationPolicies(services, state);
+    }
+
+    /// <summary>Registers the personal API key scheme so <c>X-API-Key</c> is honoured on MCP routes.</summary>
+    private static void AddApiKeyScheme(AuthenticationBuilder authBuilder)
+    {
+        authBuilder.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+            McpTransportAuthenticationSchemes.ApiKey,
+            displayName: "MCP Gateway API Key",
+            configureOptions: _ => { });
     }
 
     private static void AddJwtAndMcpAuthentication(IServiceCollection services, ResolvedMcpTransportAuthentication state)
@@ -75,6 +85,8 @@ internal static class McpTransportAuthenticationWebRegistrar
             });
         }
 
+        AddApiKeyScheme(authBuilder);
+
         if (state.UseMcpOAuthChallenge)
         {
             var authorizationServersInMetadata = state.ProxyEntraAuthorizationServerMetadata
@@ -109,10 +121,15 @@ internal static class McpTransportAuthenticationWebRegistrar
         {
             options.AddPolicy(McpTransportAuthorizationPolicy.Name, policy =>
             {
+                // X-API-Key is always accepted on MCP transport routes — it's the OAuth2-bypass path
+                // for clients that don't speak OIDC. The handler returns NoResult when the header is
+                // absent, so the JWT/Entra schemes still get a chance to evaluate the request normally.
+                var schemes = new List<string> { McpTransportAuthenticationSchemes.ApiKey };
                 if (state.RegistersEntraJwtBearerForMcp)
-                    policy.AddAuthenticationSchemes(McpTransportAuthenticationSchemes.EntraAccessToken, JwtBearerDefaults.AuthenticationScheme);
-                else
-                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+                    schemes.Add(McpTransportAuthenticationSchemes.EntraAccessToken);
+                schemes.Add(JwtBearerDefaults.AuthenticationScheme);
+
+                policy.AddAuthenticationSchemes(schemes.ToArray());
                 policy.RequireAuthenticatedUser();
             });
         });

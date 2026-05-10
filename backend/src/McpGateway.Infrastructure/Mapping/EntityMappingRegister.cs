@@ -17,6 +17,9 @@ public class EntityMappingRegister : IRegister
 
         config.NewConfig<McpAdapter, McpAdapterEntity>()
             .Map(dest => dest.Headers, src => SerializeHeaders(src.Headers));
+
+        config.NewConfig<ApiKeyEntity, ApiKey>();
+        config.NewConfig<ApiKey, ApiKeyEntity>();
     }
 
     private static Dictionary<string, string>? DeserializeHeaders(string? headersJson)

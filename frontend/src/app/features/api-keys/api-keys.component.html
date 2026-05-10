@@ -1,0 +1,237 @@
+<div class="apikeys">
+  <header class="apikeys__header">
+    <div class="ds-page-heading">
+      <div class="ds-icon-chip ds-page-heading__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+        </svg>
+      </div>
+      <div class="ds-page-heading__text">
+        <h1 class="apikeys__title">API keys</h1>
+        <p class="apikeys__subtitle">
+          Authenticate MCP clients that can't speak OAuth2. Pass the key as
+          <code>X-API-Key: &lt;value&gt;</code> on requests to <code>/adapters/&lt;name&gt;/mcp</code>
+          or <code>/adapters/&lt;name&gt;/sse</code>.
+        </p>
+      </div>
+    </div>
+    <div class="apikeys__actions">
+      <button type="button" class="action-btn primary" (click)="openCreateModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        <span>Generate API key</span>
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="apikeys__loading">Loading…</div>
+  } @else if (!hasKeys()) {
+    <div class="apikeys__empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+      </svg>
+      <h2>No API keys yet</h2>
+      <p>Generate a key to let an MCP client connect without OAuth2.</p>
+      <button type="button" class="action-btn primary" (click)="openCreateModal()">Generate first key</button>
+    </div>
+  } @else {
+    <div class="apikeys__table" role="table" aria-label="API keys">
+      <div class="apikeys__row apikeys__row--head" role="row">
+        <span role="columnheader">Name</span>
+        <span role="columnheader">Key</span>
+        <span role="columnheader">Created</span>
+        <span role="columnheader">Last used</span>
+        <span role="columnheader">Status</span>
+        <span role="columnheader" class="apikeys__row__actions">Actions</span>
+      </div>
+
+      @for (k of keys(); track trackById($index, k)) {
+        <div class="apikeys__row" role="row" [class.apikeys__row--revoked]="!k.isActive">
+          <div role="cell" class="apikeys__name">
+            <span class="apikeys__name-label">{{ k.name }}</span>
+            @if (k.createdBy) {
+              <span class="apikeys__created-by">by {{ k.createdBy }}</span>
+            }
+          </div>
+
+          <div role="cell" class="apikeys__keycell">
+            @if (revealedValue(k.id); as plaintext) {
+              <code class="apikeys__keyvalue apikeys__keyvalue--revealed">{{ plaintext }}</code>
+              <button
+                type="button"
+                class="icon-btn"
+                [class.icon-btn--copied]="isCopied('row:' + k.id)"
+                (click)="copyToClipboard(plaintext, 'row:' + k.id)"
+                [title]="isCopied('row:' + k.id) ? 'Copied!' : 'Copy'"
+              >
+                @if (isCopied('row:' + k.id)) {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                }
+              </button>
+            } @else {
+              <code class="apikeys__keyvalue">{{ maskFor(k.keyPrefix) }}</code>
+            }
+            <button
+              type="button"
+              class="icon-btn"
+              (click)="toggleReveal(k)"
+              [disabled]="isRevealLoading(k.id) || !k.isActive"
+              [title]="revealedValue(k.id) ? 'Hide' : 'Reveal'"
+            >
+              @if (revealedValue(k.id)) {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A10.93 10.93 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+
+          <div role="cell" class="apikeys__date">{{ k.createdAt | date:'medium' }}</div>
+          <div role="cell" class="apikeys__date">{{ k.lastUsedAt ? (k.lastUsedAt | date:'medium') : '—' }}</div>
+
+          <div role="cell">
+            @if (k.isActive) {
+              <span class="apikeys__badge apikeys__badge--active">Active</span>
+            } @else {
+              <span class="apikeys__badge apikeys__badge--revoked">Revoked</span>
+            }
+          </div>
+
+          <div role="cell" class="apikeys__row__actions">
+            @if (k.isActive) {
+              <button type="button" class="action-btn danger small" (click)="promptRevoke(k.id)">
+                Revoke
+              </button>
+            } @else {
+              <span class="apikeys__placeholder">—</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- Create modal -->
+@if (showCreateModal()) {
+  <div class="modal-backdrop" (click)="closeCreateModal()">
+    <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="create-key-title">
+      <header class="modal__header">
+        <h2 id="create-key-title">Generate API key</h2>
+        <button type="button" class="icon-btn" (click)="closeCreateModal()" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </header>
+      <div class="modal__body">
+        <label class="form-field">
+          <span class="form-field__label">Name</span>
+          <input
+            type="text"
+            class="form-field__input"
+            [(ngModel)]="newKeyName"
+            (keydown.enter)="submitCreate()"
+            placeholder="e.g. zapier-prod"
+            maxlength="120"
+            autofocus
+          />
+          <span class="form-field__hint">A label so you can recognise this key later. The key value itself is generated for you.</span>
+        </label>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="action-btn secondary" (click)="closeCreateModal()">Cancel</button>
+        <button type="button" class="action-btn primary" (click)="submitCreate()" [disabled]="creating() || !newKeyName.trim()">
+          {{ creating() ? 'Generating…' : 'Generate' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}
+
+<!-- Just-created modal: shows plaintext exactly once -->
+@if (justCreated(); as created) {
+  <div class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="created-key-title">
+      <header class="modal__header">
+        <h2 id="created-key-title">API key generated</h2>
+      </header>
+      <div class="modal__body">
+        <div class="callout callout--warning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <strong>Copy this key now.</strong>
+            You can re-display it anytime from this page (it's stored encrypted), but copying now keeps the workflow tidy.
+          </div>
+        </div>
+
+        <div class="created-key-box">
+          <code>{{ created.key }}</code>
+          <button
+            type="button"
+            class="created-key-copy"
+            [class.created-key-copy--copied]="isCopied('created')"
+            (click)="copyToClipboard(created.key, 'created')"
+          >
+            @if (isCopied('created')) {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Copied</span>
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span>Copy</span>
+            }
+          </button>
+        </div>
+
+        <p class="modal__detail"><strong>Name:</strong> {{ created.metadata.name }}</p>
+        <p class="modal__detail"><strong>Usage:</strong>
+          <code>X-API-Key: {{ created.key }}</code>
+        </p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="action-btn primary" (click)="dismissJustCreated()">Done</button>
+      </footer>
+    </div>
+  </div>
+}
+
+<!-- Revoke confirmation -->
+@if (confirmRevokeId(); as id) {
+  <div class="modal-backdrop" (click)="cancelRevoke()">
+    <div class="modal modal--small" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <header class="modal__header">
+        <h2>Revoke this API key?</h2>
+      </header>
+      <div class="modal__body">
+        <p>The key will stop working immediately. Any client using it will need a new one.</p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="action-btn secondary" (click)="cancelRevoke()">Cancel</button>
+        <button type="button" class="action-btn danger" (click)="confirmRevoke()">Revoke</button>
+      </footer>
+    </div>
+  </div>
+}

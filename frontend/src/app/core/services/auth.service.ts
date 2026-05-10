@@ -23,6 +23,9 @@ export class AuthService {
 
   readonly user = this.userSignal.asReadonly();
 
+  /** True when the current gateway JWT carries the <c>admin</c> role claim. */
+  readonly isAdmin = computed(() => this.extractRoles(this.tokenSignal()).includes('admin'));
+
   private readonly _providerConfigs = signal<AuthProviderConfig[]>([]);
   private _configLoaded = false;
 
@@ -58,6 +61,34 @@ export class AuthService {
       } catch {
         // ignore
       }
+    }
+  }
+
+  /**
+   * Extracts role claims from a gateway JWT payload. Recognises the standard URI form
+   * (<c>http://schemas.microsoft.com/ws/2008/06/identity/claims/role</c>) emitted by
+   * <c>System.Security.Claims.ClaimTypes.Role</c>, plus the bare <c>role</c> / <c>roles</c>
+   * names that some IdPs use. Always returns an array (empty when no token / no claim).
+   */
+  private extractRoles(token: string | null): string[] {
+    if (!token) return [];
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return [];
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      const candidates = [
+        payload?.['role'],
+        payload?.['roles'],
+        payload?.['http://schemas.microsoft.com/ws/2008/06/identity/claims/role']
+      ];
+      const roles: string[] = [];
+      for (const c of candidates) {
+        if (Array.isArray(c)) roles.push(...c.filter((x: unknown) => typeof x === 'string'));
+        else if (typeof c === 'string') roles.push(c);
+      }
+      return roles;
+    } catch {
+      return [];
     }
   }
 

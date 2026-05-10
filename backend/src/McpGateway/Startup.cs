@@ -1,9 +1,11 @@
 using Mapster;
 using MapsterMapper;
+using McpGateway.Application.Auth;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Mapping;
 using McpGateway.Application.Proxying;
 using McpGateway.Application.Services;
+using McpGateway.Auth;
 using McpGateway.Authentication;
 using McpGateway.Authentication.DependencyInjection;
 using McpGateway.Domain.Interfaces;
@@ -120,6 +122,12 @@ public sealed class Startup
         services.AddScoped<IProxyService, ProxyService>();
         services.AddScoped<ExcelService>();
         services.AddScoped<IMcpAdapterRepository, McpAdapterRepository>();
+
+        // API keys: DataProtection envelope for reveal + scoped service / repository.
+        services.AddDataProtection();
+        services.AddSingleton<IApiKeyCipher, DataProtectionApiKeyCipher>();
+        services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+        services.AddScoped<IApiKeyService, ApiKeyService>();
     }
 
     private void AddAuth(IServiceCollection services)

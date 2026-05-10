@@ -10,6 +10,7 @@ namespace McpGateway.Infrastructure.Data;
 public class McpGatewayDbContext(DbContextOptions<McpGatewayDbContext> options) : DbContext(options)
 {
     public DbSet<McpAdapterEntity> McpAdapters { get; set; }
+    public DbSet<ApiKeyEntity> ApiKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,18 @@ public class McpGatewayDbContext(DbContextOptions<McpGatewayDbContext> options) 
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
             entity.Property(e => e.LastError).HasMaxLength(1000);
+        });
+
+        // Configure ApiKeyEntity
+        modelBuilder.Entity<ApiKeyEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
+            entity.Property(e => e.CreatedBy).HasMaxLength(320);
+            entity.Property(e => e.KeyHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.KeyCipher).IsRequired().HasMaxLength(2000);
+            entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(16);
+            entity.HasIndex(e => e.KeyHash).IsUnique();
         });
     }
 }

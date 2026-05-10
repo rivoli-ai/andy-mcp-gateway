@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using McpGateway.Application.Auth;
 using McpGateway.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
@@ -84,9 +85,30 @@ public class AuthController : ControllerBase
 
             var name = principal.FindFirst("name")?.Value ?? email;
 
-            var appJwt = _authenticationService.GenerateToken(sub, email, name);
+            // Forward Azure App Roles (`roles` claim, one Claim per assigned value) plus
+            // any standard `role`/ClaimTypes.Role claims if the upstream mapped them.
+            var roles = principal.Claims
+                .Where(c => c.Type is "roles" or "role" or ClaimTypes.Role)
+                .Select(c => c.Value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 
-            return Ok(new AuthResponse(appJwt, new { email, name }));
+            // Log every claim type the upstream returned — makes it obvious whether Azure
+            // actually shipped the App Role or not (and under which claim type).
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                var claimTypesSeen = string.Join(", ", principal.Claims
+                    .Select(c => c.Type)
+                    .Distinct(StringComparer.Ordinal));
+                _logger.LogInformation(
+                    "[Auth] {Provider} principal validated. sub={Sub} email={Email} roles=[{Roles}] claimTypes=[{ClaimTypes}]",
+                    provider, sub, email, string.Join(",", roles), claimTypesSeen);
+            }
+
+            var appJwt = _authenticationService.GenerateToken(sub, email, name, roles);
+
+            return Ok(new AuthResponse(appJwt, new { email, name, roles }));
         }
         catch (Exception ex)
         {

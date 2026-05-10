@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   {
@@ -39,6 +40,11 @@ export const routes: Routes = [
     path: 'adapters/:id/edit',
     loadComponent: () => import('./features/adapters/adapter-form/adapter-form.component').then(m => m.AdapterFormComponent),
     canActivate: [authGuard]
+  },
+  {
+    path: 'api-keys',
+    loadComponent: () => import('./features/api-keys/api-keys.component').then(m => m.ApiKeysComponent),
+    canActivate: [adminGuard]
   },
   {
     path: '**',
