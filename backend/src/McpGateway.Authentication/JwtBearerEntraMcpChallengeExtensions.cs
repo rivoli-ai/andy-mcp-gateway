@@ -12,6 +12,12 @@ internal static class JwtBearerEntraMcpChallengeExtensions
 {
     public static void AttachMcpResourceMetadataChallenge(JwtBearerOptions options)
     {
+        // JwtBearerOptions.Events is null by default; AddJwtBearer doesn't initialise it.
+        // Without this, every request through the authentication middleware NRE's on the
+        // first OnChallenge access — including AllowAnonymous endpoints, since the auth
+        // middleware still warms up handlers per scheme.
+        options.Events ??= new JwtBearerEvents();
+
         var priorChallenge = options.Events.OnChallenge;
         options.Events.OnChallenge = async context =>
         {
