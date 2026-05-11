@@ -1,4 +1,5 @@
 using FluentAssertions;
+using McpGateway.Application.Bridging;
 using McpGateway.Application.Interfaces;
 using McpGateway.Controllers;
 using Microsoft.AspNetCore.Http;
@@ -10,170 +11,115 @@ using Xunit;
 namespace McpGateway.Tests.Controllers;
 
 /// <summary>
-/// Unit tests for the ProxyController API controller.
+/// Unit tests for <see cref="ProxyController"/>. Bridge routes (<c>/sse</c>, <c>/messages</c>,
+/// <c>/mcp</c>) must delegate to <see cref="IMcpBridgeService"/>; only the legacy
+/// <c>/message</c> path keeps going through <see cref="IProxyService"/>.
 /// </summary>
 public class ProxyControllerTests
 {
     private readonly Mock<IProxyService> _mockProxyService;
+    private readonly Mock<IMcpBridgeService> _mockBridge;
     private readonly Mock<ILogger<ProxyController>> _mockLogger;
     private readonly ProxyController _controller;
 
     public ProxyControllerTests()
     {
         _mockProxyService = new Mock<IProxyService>();
+        _mockBridge = new Mock<IMcpBridgeService>();
         _mockLogger = new Mock<ILogger<ProxyController>>();
-        _controller = new ProxyController(_mockProxyService.Object, _mockLogger.Object);
+        _controller = new ProxyController(_mockProxyService.Object, _mockBridge.Object, _mockLogger.Object);
     }
 
     [Fact]
-    public async Task ForwardSseRequest_WhenSuccessful_ShouldCompleteSuccessfully()
+    public async Task OpenSseStream_DelegatesToBridge()
     {
-        // Arrange
         var adapterName = "test-adapter";
-
-        _mockProxyService.Setup(s => s.ForwardSseRequestAsync(adapterName, It.IsAny<HttpContext>()))
+        _mockBridge.Setup(s => s.HandleSseStreamAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        // Act
-        await _controller.ForwardSseRequest(adapterName);
+        await _controller.OpenSseStream(adapterName, CancellationToken.None);
 
-        // Assert
-        _mockProxyService.Verify(s => s.ForwardSseRequestAsync(adapterName, It.IsAny<HttpContext>()), Times.Once);
+        _mockBridge.Verify(s => s.HandleSseStreamAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ForwardSseRequest_WhenServiceThrows_ShouldHandleException()
+    public async Task PostSseMessages_DelegatesToBridge()
     {
-        // Arrange
         var adapterName = "test-adapter";
-
-        _mockProxyService.Setup(s => s.ForwardSseRequestAsync(adapterName, It.IsAny<HttpContext>()))
-            .ThrowsAsync(new Exception("Service error"));
-
-        // Act - Exception is handled within the controller now
-        await _controller.ForwardSseRequest(adapterName);
-
-        // Assert
-        _mockProxyService.Verify(s => s.ForwardSseRequestAsync(adapterName, It.IsAny<HttpContext>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ForwardStreamableHttpRequest_WhenSuccessful_ShouldCompleteSuccessfully()
-    {
-        // Arrange
-        var adapterName = "test-adapter";
-        var cancellationToken = CancellationToken.None;
-
-        _mockProxyService.Setup(s => s.ForwardStreamableHttpRequestAsync(adapterName, It.IsAny<HttpContext>(), cancellationToken))
+        _mockBridge.Setup(s => s.HandleSseMessagesAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        // Act
-        await _controller.ForwardStreamableHttpRequest(adapterName, cancellationToken);
+        await _controller.PostSseMessages(adapterName, CancellationToken.None);
 
-        // Assert
-        _mockProxyService.Verify(s => s.ForwardStreamableHttpRequestAsync(adapterName, It.IsAny<HttpContext>(), cancellationToken), Times.Once);
+        _mockBridge.Verify(s => s.HandleSseMessagesAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ForwardStreamableHttpRequest_WhenServiceThrows_ShouldHandleException()
+    public async Task PostStreamable_DelegatesToBridge()
     {
-        // Arrange
         var adapterName = "test-adapter";
-        var cancellationToken = CancellationToken.None;
+        var ct = CancellationToken.None;
+        _mockBridge.Setup(s => s.HandleStreamablePostAsync(adapterName, It.IsAny<HttpContext>(), ct))
+            .Returns(Task.CompletedTask);
 
-        _mockProxyService.Setup(s => s.ForwardStreamableHttpRequestAsync(adapterName, It.IsAny<HttpContext>(), cancellationToken))
-            .ThrowsAsync(new Exception("Service error"));
+        await _controller.PostStreamable(adapterName, ct);
 
-        // Act - Exception is handled within the controller now
-        await _controller.ForwardStreamableHttpRequest(adapterName, cancellationToken);
-
-        // Assert
-        _mockProxyService.Verify(s => s.ForwardStreamableHttpRequestAsync(adapterName, It.IsAny<HttpContext>(), cancellationToken), Times.Once);
+        _mockBridge.Verify(s => s.HandleStreamablePostAsync(adapterName, It.IsAny<HttpContext>(), ct), Times.Once);
     }
 
     [Fact]
-    public async Task SendMessages_WhenSuccessful_ShouldCompleteSuccessfully()
+    public async Task OpenStreamableServerStream_DelegatesToBridge()
     {
-        // Arrange
+        var adapterName = "test-adapter";
+        var ct = CancellationToken.None;
+        _mockBridge.Setup(s => s.HandleStreamableGetAsync(adapterName, It.IsAny<HttpContext>(), ct))
+            .Returns(Task.CompletedTask);
+
+        await _controller.OpenStreamableServerStream(adapterName, ct);
+
+        _mockBridge.Verify(s => s.HandleStreamableGetAsync(adapterName, It.IsAny<HttpContext>(), ct), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_DelegatesToProxyServiceWithRetry()
+    {
         var adapterName = "test-adapter";
 
-        // Setup HTTP context
         var request = new Mock<HttpRequest>();
         var httpContext = new Mock<HttpContext>();
         request.Setup(r => r.QueryString).Returns(QueryString.Empty);
         httpContext.Setup(c => c.Request).Returns(request.Object);
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext.Object
-        };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext.Object };
 
         _mockProxyService.Setup(s => s.ForwardRequestAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<string>(), true))
             .Returns(Task.CompletedTask);
 
-        // Act
-        await _controller.SendMessages(adapterName);
-
-        // Assert
-        _mockProxyService.Verify(s => s.ForwardRequestAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<string>(), true), Times.Once);
-    }
-
-
-    [Fact]
-    public async Task SendMessage_WhenSuccessful_ShouldCompleteSuccessfully()
-    {
-        // Arrange
-        var adapterName = "test-adapter";
-
-        // Setup HTTP context
-        var request = new Mock<HttpRequest>();
-        var httpContext = new Mock<HttpContext>();
-        request.Setup(r => r.QueryString).Returns(QueryString.Empty);
-        httpContext.Setup(c => c.Request).Returns(request.Object);
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext.Object
-        };
-
-        _mockProxyService.Setup(s => s.ForwardRequestAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<string>(), true))
-            .Returns(Task.CompletedTask);
-
-        // Act
         await _controller.SendMessage(adapterName);
 
-        // Assert
         _mockProxyService.Verify(s => s.ForwardRequestAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<string>(), true), Times.Once);
     }
 
-
     [Theory]
-    [InlineData("", "messages")]
-    [InlineData("?param=value", "messages?param=value")]
-    [InlineData("?param1=value1&param2=value2", "messages?param1=value1&param2=value2")]
-    public async Task SendMessages_WithQueryString_ShouldPassCorrectMethod(string queryString, string expectedMethod)
+    [InlineData("", "message")]
+    [InlineData("?param=value", "message?param=value")]
+    [InlineData("?param1=value1&param2=value2", "message?param1=value1&param2=value2")]
+    public async Task SendMessage_AppendsQueryString(string queryString, string expectedEndpoint)
     {
-        // Arrange
         var adapterName = "test-adapter";
 
-        // Setup HTTP context with query string
         var request = new Mock<HttpRequest>();
         var httpContext = new Mock<HttpContext>();
         request.Setup(r => r.QueryString).Returns(new QueryString(queryString));
         httpContext.Setup(c => c.Request).Returns(request.Object);
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext.Object
-        };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext.Object };
 
-        string capturedMethod = "";
+        var captured = string.Empty;
         _mockProxyService.Setup(s => s.ForwardRequestAsync(adapterName, It.IsAny<HttpContext>(), It.IsAny<string>(), true))
-            .Callback<string, HttpContext, string, bool>((name, ctx, method, retry) => capturedMethod = method)
+            .Callback<string, HttpContext, string, bool>((_, _, endpoint, _) => captured = endpoint)
             .Returns(Task.CompletedTask);
 
-        // Act
-        await _controller.SendMessages(adapterName);
+        await _controller.SendMessage(adapterName);
 
-        // Assert
-        capturedMethod.Should().Be(expectedMethod);
+        captured.Should().Be(expectedEndpoint);
     }
-
 }
