@@ -333,6 +333,24 @@
                   </button>
                 </div>
                 <div class="integration-code-sample__toolbar">
+                  <div class="integration-code-serde-toggle" role="group" aria-label="Transport" title="The gateway exposes both transports for every adapter via its cross-transport bridge.">
+                    <button
+                      type="button"
+                      class="integration-code-serde-btn"
+                      [class.integration-code-serde-btn--active]="resolveTransport() === 'streamable-http'"
+                      (click)="setIntegrationTransport('streamable-http')"
+                    >
+                      HTTP
+                    </button>
+                    <button
+                      type="button"
+                      class="integration-code-serde-btn"
+                      [class.integration-code-serde-btn--active]="resolveTransport() === 'sse'"
+                      (click)="setIntegrationTransport('sse')"
+                    >
+                      SSE
+                    </button>
+                  </div>
                   <div class="integration-code-serde-toggle" role="group" aria-label="Format">
                     <button
                       type="button"

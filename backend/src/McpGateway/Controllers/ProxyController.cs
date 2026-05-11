@@ -1,3 +1,4 @@
+using McpGateway.Application.Bridging;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Proxying;
 using McpGateway.Authentication;
@@ -7,9 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace McpGateway.Controllers;
 
 /// <summary>
-/// MCP transport surface — gateway-public routes that forward to the upstream adapter
-/// configured under <c>{adapterName}</c>. Authentication is enforced by
-/// <see cref="McpTransportAuthorizationPolicy.Name"/>.
+/// MCP transport surface. The gateway exposes <b>both</b> the legacy SSE pair
+/// (<c>/adapters/{name}/sse</c> + <c>/adapters/{name}/messages</c>) and the modern
+/// streamable-HTTP endpoint (<c>/adapters/{name}/mcp</c>) for <i>every</i> adapter,
+/// regardless of which protocol the upstream actually speaks — the <see cref="IMcpBridgeService"/>
+/// translates between the two transports when they don't match.
 /// </summary>
 [ApiController]
 [Authorize(Policy = McpTransportAuthorizationPolicy.Name)]
@@ -17,73 +20,52 @@ namespace McpGateway.Controllers;
 public sealed class ProxyController : ControllerBase
 {
     private readonly IProxyService _proxyService;
+    private readonly IMcpBridgeService _bridge;
     private readonly ILogger<ProxyController> _logger;
 
-    public ProxyController(IProxyService proxyService, ILogger<ProxyController> logger)
+    public ProxyController(IProxyService proxyService, IMcpBridgeService bridge, ILogger<ProxyController> logger)
     {
         _proxyService = proxyService;
+        _bridge = bridge;
         _logger = logger;
     }
 
-    /// <summary>Open a Server-Sent Events stream from the adapter to the client.</summary>
+    /// <summary>SSE client opens the long-lived event stream.</summary>
     [HttpGet("{adapterName}/sse")]
-    public async Task ForwardSseRequest(string adapterName)
-    {
-        try
-        {
-            await _proxyService.ForwardSseRequestAsync(adapterName, HttpContext);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in SSE request to {AdapterName}", adapterName);
-        }
-    }
+    public Task OpenSseStream(string adapterName, CancellationToken cancellationToken) =>
+        _bridge.HandleSseStreamAsync(adapterName, HttpContext, cancellationToken);
 
-    /// <summary>Forward a streamable HTTP MCP exchange to the adapter.</summary>
-    [HttpGet("{adapterName}/mcp")]
-    [HttpPost("{adapterName}/mcp")]
-    public async Task ForwardStreamableHttpRequest(string adapterName, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("MCP request to {AdapterName} started at {Time}", adapterName, DateTime.UtcNow);
-
-        try
-        {
-            using var registration = cancellationToken.Register(() =>
-                _logger.LogWarning("MCP request to {AdapterName} cancelled at {Time}", adapterName, DateTime.UtcNow));
-
-            await _proxyService.ForwardStreamableHttpRequestAsync(adapterName, HttpContext, cancellationToken);
-
-            _logger.LogInformation("MCP request to {AdapterName} completed at {Time}", adapterName, DateTime.UtcNow);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning("MCP request to {AdapterName} was cancelled", adapterName);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in streamable HTTP request to {AdapterName}", adapterName);
-        }
-    }
-
-    /// <summary>Forward a POST /messages payload to the adapter, with retry.</summary>
+    /// <summary>SSE client POSTs a JSON-RPC frame for the upstream MCP server.</summary>
     [HttpPost("{adapterName}/messages")]
-    public Task SendMessages(string adapterName) => ForwardWithErrorHandlingAsync(adapterName, "messages");
+    public Task PostSseMessages(string adapterName, CancellationToken cancellationToken) =>
+        _bridge.HandleSseMessagesAsync(adapterName, HttpContext, cancellationToken);
 
-    /// <summary>Forward a POST /message payload to the adapter, with retry.</summary>
+    /// <summary>
+    /// Streamable-HTTP client POSTs JSON-RPC. Returns either a single JSON response or
+    /// (if the upstream is SSE) the same response after the gateway demultiplexes the
+    /// upstream event stream by JSON-RPC id.
+    /// </summary>
+    [HttpPost("{adapterName}/mcp")]
+    public Task PostStreamable(string adapterName, CancellationToken cancellationToken) =>
+        _bridge.HandleStreamablePostAsync(adapterName, HttpContext, cancellationToken);
+
+    /// <summary>Streamable-HTTP client opens the server-initiated event stream on the MCP endpoint.</summary>
+    [HttpGet("{adapterName}/mcp")]
+    public Task OpenStreamableServerStream(string adapterName, CancellationToken cancellationToken) =>
+        _bridge.HandleStreamableGetAsync(adapterName, HttpContext, cancellationToken);
+
+    /// <summary>Legacy passthrough route — kept for compatibility with the previous proxy.</summary>
     [HttpPost("{adapterName}/message")]
-    public Task SendMessage(string adapterName) => ForwardWithErrorHandlingAsync(adapterName, "message");
-
-    private async Task ForwardWithErrorHandlingAsync(string adapterName, string endpointName)
+    public async Task SendMessage(string adapterName)
     {
         try
         {
-            var endpoint = AppendQueryString(endpointName);
+            var endpoint = AppendQueryString("message");
             await _proxyService.ForwardRequestAsync(adapterName, HttpContext, endpoint, retry: true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error forwarding {Endpoint} to adapter {AdapterName}", endpointName, adapterName);
+            _logger.LogError(ex, "Error forwarding message to adapter {AdapterName}", adapterName);
             await McpProxyErrors.WriteJsonErrorAsync(HttpContext, StatusCodes.Status500InternalServerError, "Internal server error");
         }
     }

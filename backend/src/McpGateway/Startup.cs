@@ -1,6 +1,7 @@
 using Mapster;
 using MapsterMapper;
 using McpGateway.Application.Auth;
+using McpGateway.Application.Bridging;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Mapping;
 using McpGateway.Application.Proxying;
@@ -8,6 +9,7 @@ using McpGateway.Application.Services;
 using McpGateway.Auth;
 using McpGateway.Authentication;
 using McpGateway.Authentication.DependencyInjection;
+using McpGateway.Hosting;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Infrastructure;
 using McpGateway.Infrastructure.Data;
@@ -128,6 +130,11 @@ public sealed class Startup
         services.AddSingleton<IApiKeyCipher, DataProtectionApiKeyCipher>();
         services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
         services.AddScoped<IApiKeyService, ApiKeyService>();
+
+        // Cross-transport MCP bridge — exposes both SSE and streamable-HTTP for every adapter.
+        services.AddSingleton<McpBridgeSessionStore>();
+        services.AddScoped<IMcpBridgeService, McpBridgeService>();
+        services.AddHostedService<BridgeSessionSweeperService>();
     }
 
     private void AddAuth(IServiceCollection services)

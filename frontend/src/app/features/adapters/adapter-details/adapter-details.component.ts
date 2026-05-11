@@ -40,6 +40,12 @@ export class AdapterDetailsComponent implements OnInit {
   readonly integrationClientOptions = INTEGRATION_CLIENT_OPTIONS;
   integrationClient: IntegrationClientId = 'opencode';
   integrationSerde: IntegrationSerde = 'json';
+  /**
+   * Transport for the integration snippet. Defaults to whatever the adapter is
+   * configured as (passthrough path is fastest), but the user can switch — the
+   * gateway exposes both transports via the cross-transport bridge.
+   */
+  integrationTransport: IntegrationSnippetInput['adapterTypeLabel'] | null = null;
 
   constructor(
     private adapterService: McpAdapterService,
@@ -159,14 +165,10 @@ export class AdapterDetailsComponent implements OnInit {
       return '';
     }
 
-    const adapterType = this.getAdapterTypeString(this.adapter.type);
-    const label: IntegrationSnippetInput['adapterTypeLabel'] =
-      adapterType === 'sse' ? 'sse' : 'streamable-http';
-
     const input: IntegrationSnippetInput = {
       adapterName: this.adapter.name,
       gatewayBaseUrl: this.appConfig.apiUrl,
-      adapterTypeLabel: label,
+      adapterTypeLabel: this.resolveTransport(),
       timeoutSeconds: this.adapter.timeoutSeconds || 30,
       enabled: !!this.adapter.enabled,
       headers:
@@ -176,6 +178,18 @@ export class AdapterDetailsComponent implements OnInit {
     };
 
     return buildIntegrationSnippet(input, this.integrationClient, this.integrationSerde);
+  }
+
+  /** Transport active on the snippet — user-selected or the adapter's own type by default. */
+  resolveTransport(): IntegrationSnippetInput['adapterTypeLabel'] {
+    if (this.integrationTransport) return this.integrationTransport;
+    if (!this.adapter) return 'streamable-http';
+    const adapterType = this.getAdapterTypeString(this.adapter.type);
+    return adapterType === 'sse' ? 'sse' : 'streamable-http';
+  }
+
+  setIntegrationTransport(transport: IntegrationSnippetInput['adapterTypeLabel']): void {
+    this.integrationTransport = transport;
   }
 
   private getAdapterTypeString(type: AdapterType | string | number): string {
