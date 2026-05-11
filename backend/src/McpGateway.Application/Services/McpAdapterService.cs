@@ -1,7 +1,11 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using MapsterMapper;
 using McpGateway.Application.DTOs;
 using McpGateway.Application.Interfaces;
 using McpGateway.Application.Mapping;
+using McpGateway.Domain.Enums;
 using McpGateway.Domain.Interfaces;
 using McpGateway.Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -144,19 +148,136 @@ public sealed class McpAdapterService : IMcpAdapterService
         };
     }
 
+    /// <summary>
+    /// MCP-aware probe. For streamable HTTP we POST a JSON-RPC <c>initialize</c> and
+    /// require a valid JSON-RPC response. For SSE we open the event stream and accept
+    /// any first event (servers send <c>endpoint</c> as soon as the session is ready).
+    /// </summary>
     private static async Task<HealthCheckResult> ProbeAsync(McpAdapter adapter)
     {
         var start = DateTime.UtcNow;
         try
         {
-            using var client = new HttpClient { Timeout = HealthCheckTimeout };
-            var response = await client.GetAsync($"{adapter.Url.TrimEnd('/')}/health").ConfigureAwait(false);
-            return new HealthCheckResult(response.IsSuccessStatusCode, ElapsedMs(start), null);
+            using var cts = new CancellationTokenSource(HealthCheckTimeout);
+            return adapter.Type switch
+            {
+                AdapterType.StreamableHttp => await ProbeStreamableHttpAsync(adapter, start, cts.Token).ConfigureAwait(false),
+                AdapterType.Sse => await ProbeSseAsync(adapter, start, cts.Token).ConfigureAwait(false),
+                _ => new HealthCheckResult(false, ElapsedMs(start), $"Unsupported adapter type '{adapter.Type}'")
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return new HealthCheckResult(false, ElapsedMs(start), $"Health check timed out after {HealthCheckTimeout.TotalSeconds}s");
         }
         catch (Exception ex)
         {
             return new HealthCheckResult(false, ElapsedMs(start), ex.Message);
         }
+    }
+
+    private static async Task<HealthCheckResult> ProbeStreamableHttpAsync(McpAdapter adapter, DateTime start, CancellationToken ct)
+    {
+        using var client = new HttpClient { Timeout = HealthCheckTimeout };
+        using var request = new HttpRequestMessage(HttpMethod.Post, adapter.Url);
+        // MCP streamable-HTTP requires the client to accept BOTH application/json (single response)
+        // AND text/event-stream (server may upgrade to a stream for the same response).
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        ApplyConfiguredHeaders(request, adapter);
+
+        request.Content = new StringContent(BuildInitializePayload(), Encoding.UTF8, "application/json");
+
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            return new HealthCheckResult(false, ElapsedMs(start), $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+
+        // text/event-stream upgrade: read just enough to see the first frame, then bail.
+        if (contentType.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ReadFirstSsePayloadAsync(stream, start, ct).ConfigureAwait(false);
+        }
+
+        // Plain JSON response — parse and validate it's a JSON-RPC response (result OR error).
+        using var doc = await JsonDocument.ParseAsync(stream, default, ct).ConfigureAwait(false);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            return new HealthCheckResult(false, ElapsedMs(start), "Response was not a JSON object");
+
+        if (doc.RootElement.TryGetProperty("error", out var errorEl))
+        {
+            var msg = errorEl.TryGetProperty("message", out var m) ? m.GetString() : "JSON-RPC error";
+            return new HealthCheckResult(false, ElapsedMs(start), msg ?? "JSON-RPC error");
+        }
+
+        if (!doc.RootElement.TryGetProperty("result", out _))
+            return new HealthCheckResult(false, ElapsedMs(start), "Missing 'result' field in JSON-RPC response");
+
+        return new HealthCheckResult(true, ElapsedMs(start), null);
+    }
+
+    private static async Task<HealthCheckResult> ProbeSseAsync(McpAdapter adapter, DateTime start, CancellationToken ct)
+    {
+        using var client = new HttpClient { Timeout = HealthCheckTimeout };
+        using var request = new HttpRequestMessage(HttpMethod.Get, adapter.Url);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        ApplyConfiguredHeaders(request, adapter);
+
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            return new HealthCheckResult(false, ElapsedMs(start), $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        if (!contentType.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase))
+            return new HealthCheckResult(false, ElapsedMs(start), $"Unexpected content-type '{contentType}' — expected text/event-stream");
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        return await ReadFirstSsePayloadAsync(stream, start, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the SSE stream just long enough to receive one non-empty event, then returns
+    /// healthy. Any partial read counts: MCP servers typically send an <c>endpoint</c>
+    /// event immediately so we don't need to decode it — its presence is enough.
+    /// </summary>
+    private static async Task<HealthCheckResult> ReadFirstSsePayloadAsync(Stream stream, DateTime start, CancellationToken ct)
+    {
+        var buffer = new byte[256];
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false);
+        return read > 0
+            ? new HealthCheckResult(true, ElapsedMs(start), null)
+            : new HealthCheckResult(false, ElapsedMs(start), "Stream closed before any event");
+    }
+
+    private static void ApplyConfiguredHeaders(HttpRequestMessage request, McpAdapter adapter)
+    {
+        if (adapter.Headers is null) return;
+        foreach (var (name, value) in adapter.Headers)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            // Content-Type / Accept etc. belong on Content.Headers, but for the probe we
+            // only forward custom auth-style headers (Authorization, X-Api-Key, …).
+            request.Headers.TryAddWithoutValidation(name, value);
+        }
+    }
+
+    private static string BuildInitializePayload()
+    {
+        var initialize = new
+        {
+            jsonrpc = "2.0",
+            id = 1,
+            method = "initialize",
+            @params = new
+            {
+                protocolVersion = "2025-03-26",
+                capabilities = new { },
+                clientInfo = new { name = "mcp-gateway-health", version = "1.0.0" }
+            }
+        };
+        return JsonSerializer.Serialize(initialize);
     }
 
     private AdapterListDto BuildList(IEnumerable<McpAdapter> adapters)
