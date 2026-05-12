@@ -15,6 +15,7 @@ using McpGateway.Infrastructure;
 using McpGateway.Infrastructure.Data;
 using McpGateway.Infrastructure.Mapping;
 using McpGateway.Infrastructure.Repositories;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 namespace McpGateway;
@@ -73,6 +74,25 @@ public sealed class Startup
         }
 
         ApplyDatabaseMigrations(webApp);
+
+        // Must run BEFORE routing/auth so HttpContext.Request.Scheme/Host reflect the
+        // values nginx (or whichever reverse proxy) put in X-Forwarded-{Proto,Host,For}.
+        // Without this, behind TLS-terminating nginx the app thinks it's on http://
+        // and emits OAuth metadata with the wrong scheme — which MCP clients reject
+        // ("protected resource http://… does not match expected https://…").
+        var forwardedOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                | ForwardedHeaders.XForwardedProto
+                | ForwardedHeaders.XForwardedHost,
+            // Trust any reverse proxy (nginx, k8s ingress, …) — the gateway sits behind
+            // exactly one of those in every deployment topology. ForwardLimit=null lets
+            // the middleware walk the full chain instead of stopping at hop 1.
+            ForwardLimit = null
+        };
+        forwardedOptions.KnownNetworks.Clear();
+        forwardedOptions.KnownProxies.Clear();
+        webApp.UseForwardedHeaders(forwardedOptions);
 
         webApp.UseRouting();
         webApp.UseCors();
@@ -161,9 +181,15 @@ public sealed class Startup
         {
             options.AddDefaultPolicy(policy =>
             {
-                policy.AllowAnyOrigin()
+                // Cline / VSCode-webview / Claude Desktop send credentialed requests during
+                // OAuth + MCP transport. With credentials the browser rejects
+                // `Access-Control-Allow-Origin: *`, so we echo the origin dynamically and
+                // expose the response headers MCP clients need to read.
+                policy.SetIsOriginAllowed(_ => true)
                     .AllowAnyMethod()
-                    .AllowAnyHeader();
+                    .AllowAnyHeader()
+                    .AllowCredentials()
+                    .WithExposedHeaders("Mcp-Session-Id", "WWW-Authenticate");
             });
         });
     }

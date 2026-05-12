@@ -98,10 +98,20 @@ internal static class McpTransportAuthenticationWebRegistrar
                 ? McpOAuthScopeHelper.ForEntraProtectedResourceMetadata(state.McpOAuth.ScopesSupported, state.AzureClientId)
                 : state.McpOAuth.ScopesSupported;
 
+            // Force the `resource` field to come from Mcp:OAuth:PublicBaseUrl (https)
+            // instead of being inferred from HttpContext.Request — that inference is
+            // unreliable behind a TLS-terminating reverse proxy (nginx → http upstream).
+            // Cline validates that the metadata `resource` exactly matches the URL it
+            // dialed; without this it sees `http://…` and rejects the connection.
+            var explicitResource = !string.IsNullOrWhiteSpace(state.McpPublicBase)
+                ? state.McpPublicBase
+                : null;
+
             authBuilder.AddMcp(options =>
             {
                 options.ResourceMetadata = new ProtectedResourceMetadata
                 {
+                    Resource = explicitResource,
                     AuthorizationServers = authorizationServersInMetadata,
                     ScopesSupported = scopesForProtectedResourceMetadata
                 };
