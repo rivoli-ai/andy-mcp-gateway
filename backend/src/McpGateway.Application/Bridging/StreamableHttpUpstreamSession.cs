@@ -6,24 +6,20 @@ namespace McpGateway.Application.Bridging;
 
 /// <summary>
 /// <see cref="IMcpBridgeSession"/> implementation for upstream servers that speak the
-/// modern streamable-HTTP MCP transport (single endpoint, with optional <c>Mcp-Session-Id</c>
-/// header and per-response upgrade to <c>text/event-stream</c>).
+/// streamable-HTTP MCP transport.
 /// <para>
-/// For each <see cref="SendRequestAsync"/> the session POSTs the frame to the upstream
-/// endpoint. The upstream either returns a single JSON response (which we return verbatim)
-/// or upgrades the response to an SSE stream — in which case we read until we find a
-/// frame whose JSON-RPC id matches the request, and feed any other frames into the hub
-/// for subscribers.
-/// </para>
-/// <para>
-/// A background pump on <c>GET /mcp</c> surfaces server-initiated frames as well. The
-/// session lazily opens that pump on the first <see cref="SubscribeServerInitiated"/> call.
+/// Built to be tolerant of "older-style" servers that don't fully implement the spec:
+/// <list type="bullet">
+///   <item>Sends <c>Mcp-Session-Id</c> only after the upstream advertised one.</item>
+///   <item>Accepts both <c>application/json</c> single response and <c>text/event-stream</c> upgrade.</item>
+///   <item>Treats responses without a Content-Type as JSON.</item>
+///   <item>Logs each upstream request/response at INFO so missing pieces are diagnosable.</item>
+/// </list>
 /// </para>
 /// </summary>
 internal sealed class StreamableHttpUpstreamSession : IMcpBridgeSession, IBridgeSessionFramePusher
 {
     public void PushServerInitiated(string rawFrame) => _hub.Dispatch(rawFrame);
-
 
     private const string SessionIdHeader = "Mcp-Session-Id";
 
@@ -60,11 +56,25 @@ internal sealed class StreamableHttpUpstreamSession : IMcpBridgeSession, IBridge
 
         if (contentType.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase))
         {
+            _logger.LogInformation(
+                "Upstream {Endpoint} responded with SSE stream — demultiplexing for id {Id}", _endpoint, idKey);
             return await ReadResponseFromSseAsync(http, idKey, cancellationToken).ConfigureAwait(false);
         }
 
-        // Single JSON response — return as-is.
-        return await http.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        // Any non-SSE response is treated as a single JSON body. Older / strict-text
+        // servers omit Content-Type entirely — we still read and return verbatim.
+        var body = await http.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation(
+            "Upstream {Endpoint} POST response: status={Status} content-type='{ContentType}' bodyLen={Len}",
+            _endpoint, (int)http.StatusCode, contentType, body?.Length ?? 0);
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            throw new InvalidOperationException(
+                $"Upstream returned an empty body on POST (status {(int)http.StatusCode}). " +
+                "Older MCP servers may need a different endpoint path or HTTP verb.");
+        }
+        return body!;
     }
 
     public async Task SendNotificationAsync(JsonRpcFrame notification, CancellationToken cancellationToken)
@@ -110,22 +120,45 @@ internal sealed class StreamableHttpUpstreamSession : IMcpBridgeSession, IBridge
         if (!string.IsNullOrEmpty(_sessionId))
             message.Headers.TryAddWithoutValidation(SessionIdHeader, _sessionId);
 
-        var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
+        _logger.LogInformation(
+            "Upstream {Endpoint} POST started (bodyLen={Len}, sessionId={Session})",
+            _endpoint, body?.Length ?? 0, _sessionId ?? "<none>");
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Upstream {Endpoint} POST transport-level failure", _endpoint);
+            throw new HttpRequestException(
+                $"Cannot reach upstream MCP server at {_endpoint}: {ex.Message}", ex);
+        }
 
         if (!response.IsSuccessStatusCode)
         {
-            var failure = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            string failure;
+            try { failure = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false); }
+            catch { failure = "<no body>"; }
+            _logger.LogWarning(
+                "Upstream {Endpoint} POST returned {Status}: {Body}",
+                _endpoint, (int)response.StatusCode, Truncate(failure, 500));
             response.Dispose();
             throw new HttpRequestException(
-                $"Upstream rejected streamable-HTTP POST: {(int)response.StatusCode} {response.ReasonPhrase} — {failure}");
+                $"Upstream rejected streamable-HTTP POST: {(int)response.StatusCode} {response.ReasonPhrase} — {Truncate(failure, 200)}");
         }
 
         if (response.Headers.TryGetValues(SessionIdHeader, out var values))
         {
             var first = values.FirstOrDefault();
             if (!string.IsNullOrEmpty(first))
+            {
+                if (!string.Equals(_sessionId, first, StringComparison.Ordinal))
+                    _logger.LogInformation("Upstream {Endpoint} assigned Mcp-Session-Id={Session}", _endpoint, first);
                 _sessionId = first;
+            }
         }
 
         return response;
@@ -202,6 +235,9 @@ internal sealed class StreamableHttpUpstreamSession : IMcpBridgeSession, IBridge
             request.Headers.TryAddWithoutValidation(name, value);
         }
     }
+
+    private static string Truncate(string s, int max) =>
+        string.IsNullOrEmpty(s) || s.Length <= max ? s : s[..max] + "...";
 
     private void ThrowIfDisposed()
     {
