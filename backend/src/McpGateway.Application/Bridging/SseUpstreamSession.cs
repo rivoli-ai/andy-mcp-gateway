@@ -134,6 +134,9 @@ internal sealed class SseUpstreamSession : IMcpBridgeSession, IBridgeSessionFram
                 if (string.Equals(sse.EventName, "endpoint", StringComparison.OrdinalIgnoreCase))
                 {
                     var endpointUri = BuildEndpointUri(sse.Data);
+                    _logger.LogInformation(
+                        "Upstream SSE 'endpoint' event for {SseEndpoint}: raw='{Raw}' resolved={Resolved}",
+                        _sseEndpoint, sse.Data, endpointUri);
                     _endpointTcs?.TrySetResult(endpointUri);
                     continue;
                 }
@@ -159,10 +162,53 @@ internal sealed class SseUpstreamSession : IMcpBridgeSession, IBridgeSessionFram
     private Uri BuildEndpointUri(string raw)
     {
         var trimmed = raw.Trim();
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+
+        // MCP SSE servers send the messages endpoint in one of three shapes:
+        //   1. Bare absolute URL    →  data: http://upstream/messages?session=xxx
+        //   2. Path relative to SSE →  data: /messages?session=xxx
+        //   3. JSON envelope        →  data: {"endpoint":"/messages?session=xxx"}
+        // We accept all three and reject any non-HTTP scheme so HttpClient never
+        // sees "file://", "ws://", … (which causes the "scheme not supported" 502).
+
+        // Form 3 — JSON envelope with an `endpoint` field.
+        if (trimmed.StartsWith('{') && trimmed.EndsWith('}'))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(trimmed);
+                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("endpoint", out var ep)
+                    && ep.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var inner = ep.GetString();
+                    if (!string.IsNullOrWhiteSpace(inner))
+                        return BuildEndpointUri(inner);
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // fall through — treat the raw string as best we can
+            }
+        }
+
+        // Form 1 — absolute HTTP(S) URL, accepted verbatim.
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute)
+            && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
+        {
             return absolute;
-        // Relative — resolve against the SSE endpoint authority.
-        return new Uri(_sseEndpoint, trimmed);
+        }
+
+        // Form 2 — relative path. Defensive cleanup: strip any leading scheme-like
+        // prefix that might have slipped in (`file:foo`, `x-thing:bar`, …) so we
+        // always end up resolving against the SSE base authority.
+        var safePath = trimmed;
+        var colon = safePath.IndexOf(':');
+        if (colon > 0 && colon < 12 && !safePath[..colon].Contains('/'))
+        {
+            safePath = safePath[(colon + 1)..];
+        }
+        safePath = safePath.TrimStart('/');
+        return new Uri(_sseEndpoint, "/" + safePath);
     }
 
     private void ApplyHeaders(HttpRequestMessage request)
