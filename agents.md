@@ -18,7 +18,7 @@ This file contains authorized commands and configuration for Claude Code Assista
 
 ### Platform-Specific Notes (macOS)
 
-- **NEVER use mono or .exe files** - This is a .NET 8.0 project running natively on macOS
+- **NEVER use mono or .exe files** - This is a .NET 9.0 project running natively on macOS
 - **Use `dotnet run`** instead of compiling to .exe and running with mono
 - **Use `dotnet <command>`** for all .NET operations (build, test, run, etc.)
 
@@ -32,7 +32,7 @@ This file contains authorized commands and configuration for Claude Code Assista
 
 ## Project Information
 
-- **Target Framework**: .NET 8.0
+- **Target Framework**: .NET 9.0
 - **Test Framework**: xUnit
 - **Coverage Tool**: Coverlet
 - **Report Generator**: ReportGenerator global tool
@@ -55,7 +55,6 @@ When completing a set of tasks or phase milestones:
 
 - Always write test in the tests/ assemblies for new code or code changes in the src/ directory
 - Run `dotnet format` before committing to ensure consistent formatting
-- Use the pre-commit hooks: `./scripts/setup-git-hooks.sh` (Linux/macOS) or `./scripts/setup-git-hooks.ps1` (Windows)
 - Ensure all tests pass: `dotnet test`
 - Generate coverage reports for significant changes
 
