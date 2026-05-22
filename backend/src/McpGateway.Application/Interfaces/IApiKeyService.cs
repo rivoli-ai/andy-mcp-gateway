@@ -5,7 +5,7 @@ namespace McpGateway.Application.Interfaces;
 /// <summary>
 /// API key management for the gateway. Keys are global to the application — anyone with
 /// access to the management UI can create, revoke, and reveal them. Authentication on
-/// MCP routes uses these keys via the <c>X-API-Key</c> header.
+/// MCP routes uses these keys via the <c>X-MCP-Key</c> header.
 /// </summary>
 public interface IApiKeyService
 {

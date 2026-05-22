@@ -14,7 +14,7 @@ interface RevealState {
 
 /**
  * Application-level API keys management page. Keys are global to the gateway and
- * authenticate MCP transport routes via the X-API-Key header — they DO NOT replace
+ * authenticate MCP transport routes via the X-MCP-Key header — they DO NOT replace
  * the user's login. The list endpoint never carries plaintext; reveal hits a
  * dedicated endpoint that decrypts the stored ciphertext on demand.
  */

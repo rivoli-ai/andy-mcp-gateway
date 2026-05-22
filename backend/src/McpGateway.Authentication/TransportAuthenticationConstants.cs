@@ -12,12 +12,12 @@ public static class McpTransportAuthenticationSchemes
     /// <summary>JWT bearer scheme that validates Microsoft Entra access tokens.</summary>
     public const string EntraAccessToken = "EntraAccessToken";
 
-    /// <summary>Personal API key scheme — checks the <c>X-API-Key</c> header against the api_keys table.</summary>
+    /// <summary>Personal API key scheme — checks the <c>X-MCP-Key</c> header against the api_keys table.</summary>
     public const string ApiKey = "ApiKey";
 }
 
-/// <summary>HTTP header used to pass a personal API key on MCP routes.</summary>
+/// <summary>HTTP header used to pass a personal API key on MCP routes (gateway-specific, not <c>X-API-Key</c>).</summary>
 public static class ApiKeyAuthenticationDefaults
 {
-    public const string HeaderName = "X-API-Key";
+    public const string HeaderName = "X-MCP-Key";
 }

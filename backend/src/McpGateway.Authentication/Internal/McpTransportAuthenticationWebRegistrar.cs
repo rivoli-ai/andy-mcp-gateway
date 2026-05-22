@@ -20,7 +20,7 @@ internal static class McpTransportAuthenticationWebRegistrar
         AddAuthorizationPolicies(services, state);
     }
 
-    /// <summary>Registers the personal API key scheme so <c>X-API-Key</c> is honoured on MCP routes.</summary>
+    /// <summary>Registers the personal API key scheme so <c>X-MCP-Key</c> is honoured on MCP routes.</summary>
     private static void AddApiKeyScheme(AuthenticationBuilder authBuilder)
     {
         authBuilder.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
@@ -131,7 +131,7 @@ internal static class McpTransportAuthenticationWebRegistrar
         {
             options.AddPolicy(McpTransportAuthorizationPolicy.Name, policy =>
             {
-                // X-API-Key is always accepted on MCP transport routes — it's the OAuth2-bypass path
+                // X-MCP-Key is always accepted on MCP transport routes — it's the OAuth2-bypass path
                 // for clients that don't speak OIDC. The handler returns NoResult when the header is
                 // absent, so the JWT/Entra schemes still get a chance to evaluate the request normally.
                 var schemes = new List<string> { McpTransportAuthenticationSchemes.ApiKey };

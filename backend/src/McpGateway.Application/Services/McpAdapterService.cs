@@ -258,7 +258,7 @@ public sealed class McpAdapterService : IMcpAdapterService
         {
             if (string.IsNullOrWhiteSpace(name)) continue;
             // Content-Type / Accept etc. belong on Content.Headers, but for the probe we
-            // only forward custom auth-style headers (Authorization, X-Api-Key, …).
+            // only forward custom auth-style headers (Authorization, X-MCP-Key, …).
             request.Headers.TryAddWithoutValidation(name, value);
         }
     }

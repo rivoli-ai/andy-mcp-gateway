@@ -10,7 +10,7 @@
         <h1 class="apikeys__title">API keys</h1>
         <p class="apikeys__subtitle">
           Authenticate MCP clients that can't speak OAuth2. Pass the key as
-          <code>X-API-Key: &lt;value&gt;</code> on requests to <code>/adapters/&lt;name&gt;/mcp</code>
+          <code>X-MCP-Key: &lt;value&gt;</code> on requests to <code>/adapters/&lt;name&gt;/mcp</code>
           or <code>/adapters/&lt;name&gt;/sse</code>.
         </p>
       </div>
@@ -208,7 +208,7 @@
 
         <p class="modal__detail"><strong>Name:</strong> {{ created.metadata.name }}</p>
         <p class="modal__detail"><strong>Usage:</strong>
-          <code>X-API-Key: {{ created.key }}</code>
+          <code>X-MCP-Key: {{ created.key }}</code>
         </p>
       </div>
       <footer class="modal__footer">

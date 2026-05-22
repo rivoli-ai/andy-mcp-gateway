@@ -11,7 +11,7 @@ namespace McpGateway.Authentication.Internal;
 
 /// <summary>
 /// AuthenticationHandler for the <see cref="McpTransportAuthenticationSchemes.ApiKey"/> scheme.
-/// Reads the <c>X-API-Key</c> header on every request:
+/// Reads the <c>X-MCP-Key</c> header on every request:
 /// <list type="bullet">
 ///   <item>Header missing → <see cref="AuthenticateResult.NoResult"/> so the next scheme (Bearer) can take over.</item>
 ///   <item>Header present and matches an active row in <c>api_keys</c> → success with a synthetic principal.</item>
@@ -51,7 +51,7 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<Authen
         var apiKey = await _repository.GetActiveByHashAsync(hash, Context.RequestAborted);
         if (apiKey is null)
         {
-            Logger.LogDebug("X-API-Key did not match any active key");
+            Logger.LogDebug("{Header} did not match any active key", ApiKeyAuthenticationDefaults.HeaderName);
             return AuthenticateResult.Fail("Invalid API key");
         }
 
