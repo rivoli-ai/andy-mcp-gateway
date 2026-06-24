@@ -1,0 +1,48 @@
+# Default service map shipped with the gateway. Conductor overlays this at
+# runtime via the LocalRuntime contract (MG5). Editable in place — the
+# gateway hot-reloads on file change.
+#
+# Each entry declares one MCP-tool-providing service:
+#
+#   serviceId          stable identifier; clients address this name
+#   localUrl           reachable when running on the dev's Mac (or any
+#                      same-host LocalRuntime). Null = cloud-only service.
+#   remoteUrlPattern   tenant-aware URL with {tenantSlug} placeholder; MG3
+#                      substitutes the bound tenant at request time
+#   requiresAuth       true when the service expects a tenant JWT (MG4)
+#
+# Routing policy: prefer-local-fallback-remote per service. The health
+# monitor probes localUrl every 5 s; on failure the router falls back to
+# remoteUrlPattern with structured logs on every transition.
+
+services:
+  - serviceId: andy-containers
+    localUrl: https://localhost:7200
+    remoteUrlPattern: https://containers.{tenantSlug}.rivoli.ai
+    requiresAuth: true
+
+  - serviceId: andy-auth
+    localUrl: https://localhost:5001
+    remoteUrlPattern: https://auth.{tenantSlug}.rivoli.ai
+    requiresAuth: false
+
+  - serviceId: andy-rbac
+    localUrl: https://localhost:5003
+    remoteUrlPattern: https://rbac.{tenantSlug}.rivoli.ai
+    requiresAuth: true
+
+  - serviceId: andy-settings
+    localUrl: https://localhost:5300
+    remoteUrlPattern: https://settings.{tenantSlug}.rivoli.ai
+    requiresAuth: true
+
+  - serviceId: andy-tenants
+    localUrl: https://localhost:5005
+    remoteUrlPattern: https://tenants.rivoli.ai
+    requiresAuth: true
+
+  # Cloud-only — no local equivalent today. Routes always go remote.
+  - serviceId: andy-agents
+    localUrl: null
+    remoteUrlPattern: https://agents.{tenantSlug}.rivoli.ai
+    requiresAuth: true
